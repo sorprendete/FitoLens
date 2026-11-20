@@ -17,6 +17,7 @@ web/dist/
 
 # Entrenamiento (datasets pesados)
 datos/
+!web/src/datos/
 *.zip
 *.onnx
 *.keras
