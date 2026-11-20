@@ -20,6 +20,7 @@ import numpy as np
 import onnxruntime as ort
 from PIL import Image
 from scipy import ndimage
+from scipy.spatial import ConvexHull
 
 log = logging.getLogger("fitolens.segmentacion")
 
@@ -29,10 +30,15 @@ LADO = 192
 _MEDIA = np.array([0.485, 0.456, 0.406], np.float32)
 _DESVIO = np.array([0.229, 0.224, 0.225], np.float32)
 
-# Reglas de confianza (calibradas con las 94 fotos de modelos/muestras y el set de pruebas)
+# Reglas de confianza (calibradas con pruebas/segmentacion: 87 fotos con referencia)
 COBERTURA_MIN = 0.02  # la hoja ocupa al menos 2 % de la foto
 COBERTURA_MAX = 0.95  # si "todo es hoja", no hay nada que separar
-CONFIANZA_MIN = 0.85  # nitidez media de la máscara (0 = todo dudoso, 1 = bordes netos)
+CONFIANZA_MIN = 0.66  # nitidez del objeto y su borde (0 = todo dudoso, 1 = bordes netos)
+NUCLEO_MIN = 0.75  # parte del objeto marcada con seguridad alta (p > 0.8)
+COBERTURA_GRANDE = 0.75  # objeto que llena casi toda la foto: se exige más nitidez
+CONFIANZA_GRANDE = 0.90
+# Una mazorca es convexa: si la forma tiene entrantes grandes, se pegó el tronco u otra mazorca.
+SOLIDEZ_MIN = {"cacao": 0.75}
 MAX_POLIGONOS = 5
 MAX_PUNTOS = 120
 
@@ -43,6 +49,8 @@ class Segmentacion:
     mascara: np.ndarray | None = None  # bool [LADO, LADO], estirada al encuadre completo de la foto
     cobertura: float = 0.0
     confianza: float = 0.0
+    nucleo: float = 0.0
+    solidez: float = 0.0  # área / área de su envolvente convexa (la peor de las regiones); 1 = convexa
     contorno: list[list[list[float]]] = field(default_factory=list)  # polígonos de [x, y] en 0-1
     motivo: str | None = None
 
@@ -107,22 +115,42 @@ def analizar(p: np.ndarray) -> Segmentacion:
     m = ndimage.binary_fill_holes(np.isin(etiquetas, elegidas))
 
     cobertura = float(m.mean())
-    # Nitidez: en una máscara confiable casi todos los píxeles están cerca de 0 o de 1. Se mide en el objeto y
-    # en una franja de fondo alrededor (lo dudoso suele estar en el borde o en manchas sueltas).
-    zona = ndimage.binary_dilation(m, iterations=6) | (p > 0.2)
+    # Nitidez: en una máscara confiable casi todos los píxeles del objeto y de una franja alrededor están cerca
+    # de 0 o de 1. Se mide solo ahí: una bruma tenue lejos del objeto (tronco, follaje) no lo vuelve dudoso.
+    zona = ndimage.binary_dilation(m, iterations=6)
     confianza = float(np.abs(2 * p[zona] - 1).mean())
-    datos = dict(mascara=m, cobertura=round(cobertura, 4), confianza=round(confianza, 4))
+    nucleo = float((p[m] > 0.8).mean()) if m.any() else 0.0
+    datos = dict(mascara=m, cobertura=round(cobertura, 4), confianza=round(confianza, 4), nucleo=round(nucleo, 4))
     if cobertura < COBERTURA_MIN:
         return _fallo("muy_pequena", **datos)
     if cobertura > COBERTURA_MAX:
         return _fallo("toda_la_foto", **datos)
-    if confianza < CONFIANZA_MIN:
+    if confianza < CONFIANZA_MIN or nucleo < NUCLEO_MIN:
+        return _fallo("dudosa", **datos)
+    if cobertura > COBERTURA_GRANDE and confianza < CONFIANZA_GRANDE:
         return _fallo("dudosa", **datos)
 
     contorno = [c for c in (_contorno(etiquetas == e) for e in elegidas) if len(c) >= 3]
     if not contorno:
         return _fallo("sin_contorno", **datos)
-    return Segmentacion(ok=True, contorno=contorno, **datos)
+    return Segmentacion(ok=True, contorno=contorno, solidez=round(min(map(_solidez, contorno)), 4), **datos)
+
+
+def apta_para(seg: Segmentacion, cultivo: str | None) -> bool:
+    """Reglas que dependen del cultivo (se conoce después del router)."""
+    return seg.ok and seg.solidez >= SOLIDEZ_MIN.get(cultivo, 0.0)
+
+
+def _solidez(poligono: list[list[float]]) -> float:
+    pts = np.array(poligono)
+    if len(pts) < 3:
+        return 0.0
+    x, y = pts.T
+    area = 0.5 * abs(np.dot(x, np.roll(y, 1)) - np.dot(y, np.roll(x, 1)))
+    try:
+        return float(area / ConvexHull(pts).volume)
+    except Exception:  # puntos alineados
+        return 0.0
 
 
 # Vecinos en sentido horario empezando por el oeste (x, y)

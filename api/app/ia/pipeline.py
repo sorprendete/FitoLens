@@ -12,7 +12,7 @@ from PIL import Image
 from app.ia import mapa_calor
 from app.ia.modelo import softmax
 from app.ia.registro import Registro
-from app.ia.segmentacion import Segmentacion, Segmentador
+from app.ia.segmentacion import Segmentacion, Segmentador, apta_para
 
 # La segmentación corre en paralelo con el router y el especialista (ONNX libera el GIL).
 _HILOS = ThreadPoolExecutor(max_workers=4, thread_name_prefix="segmentacion")
@@ -149,6 +149,9 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
 
     # 4. Dónde está la hoja (calculado en paralelo; solo para mostrar, no cambia el diagnóstico)
     hoja = _hoja(r, tarea, reloj)
+    if hoja is not None and not apta_para(hoja, cultivo):
+        hoja = None
+        r.pasos[-1]["detalle"] = "La forma ubicada no parece una sola mazorca; se usa la foto completa"
     if hoja is not None and salida.cam is not None:
         if mapa_calor.fraccion_dentro(salida.cam[mejor], hoja.mascara) < ATENCION_MIN_DENTRO:
             hoja = None

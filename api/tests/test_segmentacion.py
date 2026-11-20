@@ -203,3 +203,19 @@ def test_api_devuelve_contorno(cliente):
 def test_segmentacion_desactivada_por_entorno(tmp_path, dir_modelos):
     from app.ia.registro import cargar
     assert cargar(dir_modelos, 1, segmentar=False).segmentador is None
+
+
+def test_bruma_lejana_no_vuelve_dudosa_la_mascara():
+    p = np.clip(elipse(0.3, 0.5, 0.12, 0.2) + 0.3 * elipse(0.8, 0.5, 0.1, 0.4), 0, 1)  # mazorca + tronco tenue
+    r = analizar(p)
+    assert r.ok and len(r.contorno) == 1
+
+
+def test_cacao_exige_forma_de_mazorca():
+    from app.ia.segmentacion import apta_para
+    convexa = analizar(elipse(0.5, 0.5, 0.15, 0.3))
+    tronco = np.maximum(elipse(0.5, 0.2, 0.15, 0.15), elipse(0.5, 0.6, 0.04, 0.35))  # mazorca pegada al tronco
+    pegada = analizar(tronco)
+    assert convexa.ok and pegada.ok and pegada.solidez < 0.75 < convexa.solidez
+    assert apta_para(convexa, "cacao") and not apta_para(pegada, "cacao")
+    assert apta_para(pegada, "tomate")  # hojas compuestas sí pueden tener entrantes
