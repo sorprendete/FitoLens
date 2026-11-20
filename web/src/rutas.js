@@ -1,10 +1,11 @@
-import { Activity, BellRing, FileSpreadsheet, BarChart3, Brain, FileClock, Grid3x3, LayoutDashboard, Map, Radar, ScanLine, Sprout, Users } from 'lucide-react'
+import { Activity, BellRing, FileSpreadsheet, BarChart3, Brain, FileClock, Grid3x3, LayoutDashboard, Map, Radar, ScanLine, Smartphone, Sprout, Users } from 'lucide-react'
 import Alertas from './paginas/admin/Alertas'
 import Amenazas from './paginas/admin/Amenazas'
 import Auditoria from './paginas/admin/Auditoria'
 import Riesgos from './paginas/admin/Riesgos'
 import Reporte from './paginas/admin/Reporte'
 import Usuarios from './paginas/admin/Usuarios'
+import AppMovil from './paginas/AppMovil'
 import Brotes from './paginas/Brotes'
 import ComoPiensa from './paginas/ComoPiensa'
 import Diagnostico from './paginas/Diagnostico'
@@ -20,6 +21,7 @@ export const RUTAS = [
   { id: 'diagnostico', titulo: 'Diagnóstico', icono: ScanLine, C: Diagnostico, acceso: 'publico', grupo: 'Principal' },
   { id: 'historial', titulo: 'Historial', icono: FileClock, C: Historial, acceso: 'cuenta', grupo: 'Principal' },
   { id: 'parcelas', titulo: 'Mis parcelas', icono: Sprout, C: Parcelas, acceso: 'cuenta', grupo: 'Principal' },
+  { id: 'app-movil', titulo: 'App móvil', icono: Smartphone, C: AppMovil, acceso: 'publico', grupo: 'Principal' },
   { id: 'brotes', titulo: 'Mapa de brotes', icono: Map, C: Brotes, acceso: 'publico', grupo: 'Región San Martín' },
   { id: 'alertas-brote', titulo: 'Alertas de brote', icono: BellRing, C: Alertas, acceso: 'admin', grupo: 'Región San Martín' },
   { id: 'reporte-semanal', titulo: 'Reporte para autoridades', icono: FileSpreadsheet, C: Reporte, acceso: 'admin', grupo: 'Región San Martín' },

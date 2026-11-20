@@ -1,4 +1,4 @@
-import { ArrowRight, Eye, EyeOff, Fingerprint, Lock, LogIn, Mail, Moon, Radar, ScanSearch, ShieldCheck, Sun, User, UserPlus } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Fingerprint, Lock, LogIn, Mail, Moon, Radar, ScanSearch, ShieldCheck, Smartphone, Sun, User, UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import Logo from '../componentes/Logo'
 import { useSesion } from '../contexto/Sesion'
@@ -110,6 +110,7 @@ export default function Acceso({ modo }) {
           <button type="button" className="btn sec ancho" onClick={() => { s.comoInvitado(); location.hash = 'diagnostico' }}>
             Probar sin cuenta<ArrowRight size={18} />
           </button>
+          <a className="acceso-app" href="#app-movil"><Smartphone size={17} />¿Trabajas en campo? <b>Descarga la app para Android</b></a>
           <p className="nota-seguridad"><ShieldCheck size={16} />Conexión cifrada. Cada acceso queda registrado y tras 5 intentos fallidos la cuenta se bloquea 15 minutos.</p>
         </form>
       </section>

@@ -30,3 +30,6 @@ Thumbs.db
 # Modelo de segmentación de la hoja (pequeño, va con el código)
 !api/app/ia/recursos/*.onnx
 !app/assets/recursos/*.onnx
+
+# APK de la app móvil (se publica con despliegue/scripts/publicar_apk.sh)
+despliegue/descargas/

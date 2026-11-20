@@ -17,6 +17,7 @@ services:
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
+      - ./descargas:/srv/descargas:ro   # APK de la app móvil (scripts/publicar_apk.sh)
       - caddy_datos:/data          # certificados HTTPS
       - caddy_config:/config
     depends_on: [web, api]

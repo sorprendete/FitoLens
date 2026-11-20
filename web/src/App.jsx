@@ -13,6 +13,7 @@ const leerHash = () => decodeURIComponent(location.hash.slice(1))
 function resolver(hash, s) {
   const inicio = s.usuario ? 'panel' : 'diagnostico'
   if (hash === 'acceso' || hash === 'registro') return s.usuario ? { id: inicio } : { acceso: hash }
+  if (hash === 'app-movil') return { id: hash } // la descarga de la app se ve sin iniciar sesión
   if (!s.sesion) return { acceso: 'acceso' }
   const ruta = RUTAS.find((r) => r.id === hash)
   if (ruta && puedeVer(ruta, s)) return { id: ruta.id }

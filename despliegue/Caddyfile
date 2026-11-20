@@ -18,6 +18,13 @@
 	handle /bot/* {
 		reverse_proxy bot:8080
 	}
+	# App móvil: el APK y su app.json viven en despliegue/descargas (fuera de git). Ver scripts/publicar_apk.sh.
+	handle /descargas/* {
+		root * /srv
+		header *.apk Content-Type application/vnd.android.package-archive
+		header *.json Cache-Control no-cache
+		file_server
+	}
 	handle {
 		reverse_proxy web:80
 	}
