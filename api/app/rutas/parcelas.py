@@ -18,7 +18,7 @@ from app.rutas.dependencias import usuario_requerido
 
 router = APIRouter(tags=["parcelas"])
 
-CULTIVOS = ("cafe", "cacao", "papa", "tomate", "pimiento")
+CULTIVOS = ("cafe", "cacao", "papa", "tomate", "pimiento", "maiz", "limon", "naranja")
 
 
 class ParcelaEntrada(BaseModel):

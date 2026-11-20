@@ -6,7 +6,8 @@ PROVINCIAS = {
     "mariscal_caceres": "Mariscal Cáceres", "moyobamba": "Moyobamba", "picota": "Picota",
     "rioja": "Rioja", "san_martin": "San Martín", "tocache": "Tocache",
 }
-CULTIVOS = {"cafe": "Café", "cacao": "Cacao", "papa": "Papa", "tomate": "Tomate", "pimiento": "Pimiento"}
+CULTIVOS = {"cafe": "Café", "cacao": "Cacao", "papa": "Papa", "tomate": "Tomate", "pimiento": "Pimiento",
+            "maiz": "Maíz", "limon": "Limón", "naranja": "Naranja"}
 SIN_PROVINCIA = "sin_provincia"
 
 

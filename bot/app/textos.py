@@ -13,7 +13,7 @@ BIENVENIDA = (
     "🌿 <b>Hola, soy FitoLens.</b>\n\n"
     "Mándame una <b>foto de una hoja</b> (o de una mazorca de cacao) y te digo si está sana "
     "o qué enfermedad tiene, y qué hacer.\n\n"
-    "Reconozco: café, cacao, papa, tomate y pimiento.\n\n"
+    "Reconozco: café, cacao, maíz, limón, naranja, papa, tomate y pimiento.\n\n"
     "📸 <b>Para una buena foto:</b>\n"
     "• Una sola hoja, de cerca, que llene la foto.\n"
     "• Con luz de día, sin sombra fuerte ni flash.\n"
@@ -37,7 +37,7 @@ def resultado(r: dict) -> str:
     estado = r.get("estado")
     if estado == "rechazada":
         return f"🚫 <b>No reconocí un cultivo en la foto.</b>\n\n{escape(r.get('motivo') or '')}\n\n" \
-               "Reconozco café, cacao, papa, tomate y pimiento."
+               "Reconozco café, cacao, maíz, limón, naranja, papa, tomate y pimiento."
     if estado == "no_concluyente":
         return (f"🤔 <b>No estoy seguro.</b>\n\n{escape(r.get('motivo') or '')}\n\n"
                 "Consejo: toma la foto más de cerca, con buena luz y que se vea una sola hoja.")

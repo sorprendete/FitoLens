@@ -3,7 +3,7 @@ from tests.conftest import token
 
 def test_salud(cliente):
     d = cliente.get("/api/salud").json()
-    assert d["estado"] == "ok" and d["base_datos"] and set(d["modelos"]) == {"router", "hortalizas", "cafe", "cacao"}
+    assert d["estado"] == "ok" and d["base_datos"] and set(d["modelos"]) == {"router", "hortalizas", "cafe", "cacao", "maiz", "citricos"}
 
 
 def test_admin_inicial_y_login(cliente):

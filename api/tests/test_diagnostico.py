@@ -85,7 +85,7 @@ def test_brotes_y_metricas(cliente):
     assert b["total"] == 3
     assert b["provincias"][0] == {"provincia": "moyobamba", "total": 2, "por_clase": {"tomate_tizon_tardio": 2}}
     m = cliente.get("/api/metricas").json()["modelos"]
-    assert {x["id"] for x in m} == {"router", "hortalizas", "cafe", "cacao"}
+    assert {x["id"] for x in m} == {"router", "hortalizas", "cafe", "cacao", "maiz", "citricos"}
     assert "campo" in m[0]
 
 

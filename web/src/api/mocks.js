@@ -1,6 +1,7 @@
 // Datos de ejemplo para trabajar sin API. NO son resultados reales del modelo:
 // la interfaz muestra "Modo demostración" mientras se usan.
 import { PROVINCIAS } from '../datos/provincias'
+import { CULTIVOS } from '../datos/clases'
 
 const espera = (ms) => new Promise((r) => setTimeout(r, ms))
 const azar = (a, b) => a + Math.random() * (b - a)
@@ -33,7 +34,9 @@ async function calorFalso(imagen) {
 const ESCENARIOS = [
   { cultivo: 'cafe', clases: ['cafe_roya', 'cafe_ojo_de_gallo', 'cafe_sana'] },
   { cultivo: 'cacao', clases: ['cacao_monilia', 'cacao_mazorca_negra', 'cacao_sana'] },
-  { cultivo: 'tomate', clases: ['tomate_tizon_tardio', 'tomate_tizon_temprano', 'tomate_septoria'] },
+  { cultivo: 'tomate', clases: ['tomate_tizon_tardio', 'tomate_tizon_temprano', 'tomate_septoriosis'] },
+  { cultivo: 'maiz', clases: ['maiz_gusano_cogollero', 'maiz_roya_comun', 'maiz_sana'] },
+  { cultivo: 'limon', clases: ['limon_cancrosis', 'limon_minador', 'limon_sana'] },
 ]
 
 export async function diagnostico(imagen) {
@@ -55,7 +58,7 @@ export async function diagnostico(imagen) {
     mapa_calor_png_base64: await calorFalso(imagen),
     motivo: concluye ? null : 'La confianza calibrada no supera el umbral del 60 %. Toma otra foto más cerca y con buena luz.',
     pasos: [
-      { ...router, detalle: `${esc.cultivo === 'cafe' ? 'Café' : esc.cultivo === 'cacao' ? 'Cacao' : 'Tomate'} (98 %)` },
+      { ...router, detalle: `${CULTIVOS[esc.cultivo].nombre} (98 %)` },
       { id: 'especialista', titulo: 'Analizar con el especialista', detalle: 'EfficientNetV2-B2 · 288 px', ms: 182 },
       { id: 'calibracion', titulo: 'Calibrar la confianza', detalle: `T = 1.4 · umbral 60 %`, ms: 1 },
       { id: 'mapa_calor', titulo: 'Señalar la zona afectada', detalle: 'CAM de la última capa', ms: 9 },
@@ -64,7 +67,7 @@ export async function diagnostico(imagen) {
   }
 }
 
-const ENFERMEDADES = ['cafe_roya', 'cafe_ojo_de_gallo', 'cacao_monilia', 'cacao_mazorca_negra', 'papa_tizon_tardio', 'tomate_tizon_tardio']
+const ENFERMEDADES = ['cafe_roya', 'cafe_ojo_de_gallo', 'cacao_monilia', 'cacao_mazorca_negra', 'papa_tizon_tardio', 'tomate_tizon_tardio', 'maiz_gusano_cogollero', 'limon_cancrosis']
 // Peso fijo por provincia para que el ejemplo sea estable entre recargas.
 const PESO = { moyobamba: 9, rioja: 8, lamas: 6, san_martin: 7, el_dorado: 3, picota: 4, bellavista: 5, huallaga: 2, mariscal_caceres: 6, tocache: 7 }
 

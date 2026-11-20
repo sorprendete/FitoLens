@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, model_validator
 
 ESPECIALISTAS_POR_DEFECTO = {
     "pimiento": "hortalizas", "papa": "hortalizas", "tomate": "hortalizas",
-    "cafe": "cafe", "cacao": "cacao",
+    "cafe": "cafe", "cacao": "cacao", "maiz": "maiz", "limon": "citricos", "naranja": "citricos",
 }
 
 

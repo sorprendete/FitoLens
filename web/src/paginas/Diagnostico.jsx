@@ -61,7 +61,7 @@ export default function Diagnostico() {
       {!foto ? (
         <div className="portada">
           <div className="portada-txt">
-            <p className="sobretitulo">Café · Cacao · Papa · Tomate · Pimiento</p>
+            <p className="sobretitulo">Café · Cacao · Maíz · Limón · Naranja · Papa · Tomate · Pimiento</p>
             <h2 className="titular">Una foto.<br /><span className="degradado">Un diagnóstico en un segundo.</span></h2>
             <p className="tenue grande-txt">FitoLens reconoce el cultivo, detecta la enfermedad y te muestra en qué parte de la hoja la vio.
               Si no está segura, te lo dice.</p>
@@ -179,7 +179,7 @@ function Resultado({ r, onOtra, version, archivo }) {
   if (r.estado === 'rechazada') return (
     <>
       <Aviso icono={ShieldAlert} tono="aviso" titulo="Esta foto no es de un cultivo soportado"
-        texto={r.motivo || 'Toma la foto de una hoja de café, papa, tomate o pimiento, o de una mazorca de cacao.'} />
+        texto={r.motivo || 'Toma la foto de una hoja de café, maíz, limón, naranja, papa, tomate o pimiento, o de una mazorca de cacao.'} />
       <Voz r={r} />
       <ConsejosFoto />
       {otra}

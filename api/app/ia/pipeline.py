@@ -26,11 +26,12 @@ _POR_DEFECTO = object()
 # necesita, así que en promedio suma ~40 ms. Medido en pruebas/volteo (README ahí). VOLTEO=false lo apaga.
 LIMITE_VOLTEO = 0.7
 
-NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao"}
+NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao",
+                   "maiz": "maíz", "limon": "limón", "naranja": "naranja"}
 _VOLTEO = "; como dudaba, revisó también la foto de cabeza"
 MOTIVOS = {
     "no_planta": "La foto no parece una planta. Toma la foto de cerca a una hoja o mazorca, con buena luz.",
-    "otra_planta": "Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café y cacao.",
+    "otra_planta": "Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café, cacao, maíz, limón y naranja.",
     "router_duda": "No se pudo reconocer el cultivo con seguridad. Prueba con una foto más cercana y nítida.",
     "sin_especialista": "Todavía no hay un modelo instalado para este cultivo.",
     "especialista_duda": (

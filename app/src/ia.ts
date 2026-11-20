@@ -25,13 +25,13 @@ type Manifest = {
 
 const MOTIVOS = {
   no_planta: 'La foto no parece una planta. Toma la foto de cerca a una hoja o mazorca, con buena luz.',
-  otra_planta: 'Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café y cacao.',
+  otra_planta: 'Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café, cacao, maíz, limón y naranja.',
   router_duda: 'No se pudo reconocer el cultivo con seguridad. Prueba con una foto más cercana y nítida.',
   sin_especialista: 'Todavía no hay un modelo instalado para este cultivo.',
   especialista_duda: 'El modelo no está seguro. Puede ser un problema que no conoce o una foto poco clara. No se emite diagnóstico para evitar un error.',
 }
-const ESPECIALISTAS = { pimiento: 'hortalizas', papa: 'hortalizas', tomate: 'hortalizas', cafe: 'cafe', cacao: 'cacao' }
-const NOMBRES_CULTIVO: Record<string, string> = { pimiento: 'pimiento', papa: 'papa', tomate: 'tomate', cafe: 'café', cacao: 'cacao' }
+const ESPECIALISTAS = { pimiento: 'hortalizas', papa: 'hortalizas', tomate: 'hortalizas', cafe: 'cafe', cacao: 'cacao', maiz: 'maiz', limon: 'citricos', naranja: 'citricos' }
+const NOMBRES_CULTIVO: Record<string, string> = { pimiento: 'pimiento', papa: 'papa', tomate: 'tomate', cafe: 'café', cacao: 'cacao', maiz: 'maíz', limon: 'limón', naranja: 'naranja' }
 const pct = (v: number) => `${Math.round(v * 100)} %`
 
 // onnxruntime es nativo: no existe en Expo Go. Ahí la app diagnostica con el servidor.

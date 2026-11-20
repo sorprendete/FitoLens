@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 const ETAPAS = [
   { icono: Camera, titulo: 'La foto', texto: 'Llega la imagen de una hoja o mazorca, tomada en el campo, con su luz y su fondo reales.' },
-  { icono: Sprout, titulo: '1. ¿Qué cultivo es?', texto: 'Un primer modelo reconoce si es café, cacao, papa, tomate o pimiento. Si es otra cosa, rechaza la foto en vez de inventar.' },
+  { icono: Sprout, titulo: '1. ¿Qué cultivo es?', texto: 'Un primer modelo reconoce si es café, cacao, maíz, limón, naranja, papa, tomate o pimiento. Si es otra cosa, rechaza la foto en vez de inventar.' },
   { icono: ScanSearch, titulo: '2. El especialista', texto: 'Cada cultivo tiene su propio modelo, entrenado solo con sus enfermedades. Así cada uno se mejora sin romper los demás.' },
   { icono: Gauge, titulo: '3. Confianza honesta', texto: 'La confianza se calibra: cuando dice 80 %, acierta cerca de 8 de cada 10 veces. Por debajo del umbral responde "no concluyente".' },
   { icono: Flame, titulo: '4. Muestra dónde miró', texto: 'El mapa de calor marca la zona de la hoja que más pesó en la decisión, para que el agricultor y el agrónomo la verifiquen.' },

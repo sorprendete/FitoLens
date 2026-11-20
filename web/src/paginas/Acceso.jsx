@@ -44,7 +44,7 @@ export default function Acceso({ modo }) {
           <p className="sobre">EXPOFERIA FISI 2026 · San Martín</p>
           <h1>La IA que ve la <span className="degradado">enfermedad</span> antes que el ojo.</h1>
           <p className="heroe-texto">Una foto de la hoja o la mazorca y FitoLens reconoce el cultivo, identifica la enfermedad y marca dónde está.
-            Pensado para el café, el cacao y las hortalizas de nuestra región.</p>
+            Pensado para el café, el cacao, el maíz, el limón, la naranja y las hortalizas de nuestra región.</p>
 
           <figure className="escaneo" aria-label="Ejemplo de análisis">
             <img src="/hoja-campo.jpg" alt="Hoja de papa con una lesión, fotografiada en campo" />

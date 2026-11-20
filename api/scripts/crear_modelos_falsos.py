@@ -16,12 +16,16 @@ LADO = 64
 
 CLASES = {
     "router": [("pimiento", None), ("papa", None), ("tomate", None), ("cafe", None),
-               ("cacao", None), ("otra_planta", None), ("no_planta", None)],
+               ("cacao", None), ("maiz", None), ("limon", None), ("naranja", None), ("otra_planta", None), ("no_planta", None)],
     "hortalizas": [("pimiento_sana", "pimiento"), ("pimiento_mancha_bacteriana", "pimiento"),
                    ("papa_sana", "papa"), ("papa_tizon_temprano", "papa"), ("papa_tizon_tardio", "papa"),
                    ("tomate_sana", "tomate"), ("tomate_tizon_tardio", "tomate"), ("tomate_mosaico", "tomate")],
     "cafe": [("cafe_sana", "cafe"), ("cafe_roya", "cafe"), ("cafe_ojo_de_gallo", "cafe")],
     "cacao": [("cacao_sana", "cacao"), ("cacao_monilia", "cacao"), ("cacao_mazorca_negra", "cacao")],
+    "maiz": [(c, "maiz") for c in ("maiz_sana", "maiz_tizon_hoja", "maiz_roya_comun", "maiz_mancha_gris",
+                                    "maiz_gusano_cogollero")],
+    "citricos": [(f"{cult}_{e}", cult) for cult in ("limon", "naranja")
+                 for e in ("sana", "cancrosis", "hlb", "mancha_negra", "melanosis", "sarna", "fumagina", "minador")],
 }
 
 
@@ -83,6 +87,8 @@ def crear_todos(carpeta: Path, cultivo_router: str = "tomate") -> None:
     crear(carpeta, "hortalizas", favorita="tomate_tizon_tardio")
     crear(carpeta, "cafe", favorita="cafe_roya")
     crear(carpeta, "cacao", favorita="cacao_monilia")
+    crear(carpeta, "maiz", favorita="maiz_gusano_cogollero")
+    crear(carpeta, "citricos", favorita="naranja_hlb")
 
 
 if __name__ == "__main__":

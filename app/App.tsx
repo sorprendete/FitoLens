@@ -77,7 +77,7 @@ function Diagnosticar() {
         <View style={[s.tarjeta, brillo(C.acento)]}>
           <Text style={s.sobre}>DIAGNÓSTICO SIN INTERNET</Text>
           <Text style={s.titulo}>Toma una foto de cerca a una hoja o mazorca</Text>
-          <Text style={s.tenue}>Café, cacao, papa, tomate y pimiento. Con buena luz y una sola hoja en la foto.</Text>
+          <Text style={s.tenue}>Café, cacao, papa, tomate, pimiento, maíz, limón y naranja. Con buena luz y una sola hoja en la foto.</Text>
           <View style={s.fila}>{Object.entries(CULTIVOS).map(([k, c]) => <Text key={k} style={[s.etiqueta, { color: c.color, borderColor: c.color + '55' }]}>{c.nombre}</Text>)}</View>
         </View>
       )}

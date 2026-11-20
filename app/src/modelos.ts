@@ -7,6 +7,8 @@ const ARCHIVOS = {
   hortalizas: require('../assets/modelos/hortalizas.onnx'),
   cafe: require('../assets/modelos/cafe.onnx'),
   cacao: require('../assets/modelos/cacao.onnx'),
+  maiz: require('../assets/modelos/maiz.onnx'),
+  citricos: require('../assets/modelos/citricos.onnx'),
 }
 export type NombreModelo = keyof typeof ARCHIVOS
 export const archivo = (n: NombreModelo) => ARCHIVOS[n]
