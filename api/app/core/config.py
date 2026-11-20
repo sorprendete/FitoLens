@@ -15,6 +15,7 @@ class Ajustes(BaseSettings):
     # Autenticación
     jwt_secreto: str = Field(min_length=32)  # obligatorio: openssl rand -hex 32
     jwt_minutos: int = 720
+    jwt_dias_dispositivo: int = 90  # sesión de la app: dura más porque el teléfono pasa días sin internet
     registro_abierto: bool = False  # si es False, solo un admin crea cuentas
     admin_usuario: str | None = None  # email del admin que se crea al arrancar si no existe
     admin_clave: str | None = None
@@ -22,6 +23,7 @@ class Ajustes(BaseSettings):
     # Modelos de IA
     modelos_dir: Path = Path("/modelos")
     ort_hilos: int = 2  # hilos de ONNX Runtime por modelo
+    volteo: bool = True  # si el modelo duda, promedia con la foto volteada arriba-abajo (+~0.2 s solo en esas fotos)
     segmentacion: bool = True  # ubica la hoja para el contorno y el mapa de calor (no cambia el diagnóstico)
     modelos_version: str = ""  # Release de GitHub instalado (MODELOS_VERSION en .env), solo informativo
 

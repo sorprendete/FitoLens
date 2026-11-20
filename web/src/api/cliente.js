@@ -113,6 +113,12 @@ export const parcelas = {
   borrarVisita: (id, vid) => privado(() => pedir(`/parcelas/${id}/visitas/${vid}`, { metodo: 'DELETE' }), () => mp.borrarVisita(id, vid)),
 }
 
+// --- Teléfonos con la app vinculados a la cuenta ---
+export const dispositivos = {
+  listar: () => privado(() => pedir('/dispositivos'), async () => []),
+  desvincular: (id) => privado(() => pedir(`/dispositivos/${id}`, { metodo: 'DELETE' }), async () => null),
+}
+
 // --- Reporte semanal para autoridades (rol admin) ---
 export const reporteSemanal = (semanas, hasta) =>
   privado(() => pedir(`/reportes/semanal?semanas=${semanas}${hasta ? `&hasta=${hasta}` : ''}`), () => Promise.reject(new Error('El reporte necesita la API real.')))

@@ -21,6 +21,11 @@ def _token(u: Usuario) -> Token:
 
 @router.post("/login", response_model=Token)
 def login(datos: Login, request: Request, sesion: Session = Depends(db)):
+    return _token(autenticar(datos, request, sesion))
+
+
+def autenticar(datos: Login, request: Request, sesion: Session, detalle: str | None = None) -> Usuario:
+    """Revisa correo y contraseña con la protección contra fuerza bruta. La usan la web y la app."""
     email = datos.email.lower()
     if esta_bloqueado(sesion, email, auditoria.ip_cliente(request)):
         auditoria.registrar(sesion, request, "login", "bloqueado", email=email,
@@ -38,8 +43,8 @@ def login(datos: Login, request: Request, sesion: Session = Depends(db)):
         raise HTTPException(403, "Tu cuenta está desactivada. Habla con el administrador.")
 
     u.ultimo_acceso = ahora()
-    auditoria.registrar(sesion, request, "login", "exito", usuario_id=u.id, email=email)
-    return _token(u)
+    auditoria.registrar(sesion, request, "login", "exito", usuario_id=u.id, email=email, detalle=detalle)
+    return u
 
 
 @router.post("/registro", response_model=Token, status_code=201)

@@ -1,11 +1,12 @@
-import { Download, Search } from 'lucide-react'
+import { Download, Search, Smartphone } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { obtenerHistorial } from '../api/cliente'
+import { dispositivos, obtenerHistorial } from '../api/cliente'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
 import { PROVINCIAS } from '../datos/provincias'
 import { pct } from '../datos/utiles'
 
 const ESTADOS = { diagnostico: 'Concluyente', no_concluyente: 'No concluyente', rechazada: 'Rechazada' }
+const ORIGENES = { web: 'Web', app: 'App', bot: 'Telegram' }
 const nombreProv = Object.fromEntries(PROVINCIAS.map((p) => [p.id, p.nombre]))
 
 export default function Historial() {
@@ -21,9 +22,9 @@ export default function Historial() {
     (!q || `${infoClase(i.clase).nombre} ${nombreProv[i.provincia] ?? ''}`.toLowerCase().includes(q.toLowerCase()))), [items, q, cultivo, estado])
 
   function exportar() {
-    const enc = ['fecha', 'cultivo', 'estado', 'resultado', 'confianza', 'provincia']
+    const enc = ['fecha', 'cultivo', 'estado', 'resultado', 'confianza', 'provincia', 'desde']
     const csv = [enc, ...filas.map((i) => [new Date(i.creado).toLocaleString('es-PE'), CULTIVOS[i.cultivo]?.nombre ?? '', ESTADOS[i.estado],
-      i.clase ? infoClase(i.clase).nombre : '', i.confianza != null ? Math.round(i.confianza * 100) : '', nombreProv[i.provincia] ?? ''])]
+      i.clase ? infoClase(i.clase).nombre : '', i.confianza != null ? Math.round(i.confianza * 100) : '', nombreProv[i.provincia] ?? '', ORIGENES[i.origen] ?? ''])]
       .map((f) => f.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n')
     const a = document.createElement('a')
     a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv' }))
@@ -47,9 +48,9 @@ export default function Historial() {
       {error && <p className="alerta mal">{error}</p>}
       <section className="tarjeta sin-relleno">
         <table className="tabla">
-          <thead><tr><th>Fecha</th><th>Cultivo</th><th>Resultado</th><th>Confianza</th><th>Provincia</th><th>Estado</th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Cultivo</th><th>Resultado</th><th>Confianza</th><th>Provincia</th><th>Desde</th><th>Estado</th></tr></thead>
           <tbody>
-            {items === null && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="6"><i /></td></tr>)}
+            {items === null && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="7"><i /></td></tr>)}
             {filas.map((i) => (
               <tr key={i.id}>
                 <td data-l="Fecha">{new Date(i.creado).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</td>
@@ -57,6 +58,7 @@ export default function Historial() {
                 <td data-l="Resultado" className="principal">{i.clase ? infoClase(i.clase, i.etiqueta).nombre : 'Foto no válida'}</td>
                 <td data-l="Confianza">{i.confianza != null ? pct(i.confianza) : '—'}</td>
                 <td data-l="Provincia">{nombreProv[i.provincia] ?? '—'}</td>
+                <td data-l="Desde">{ORIGENES[i.origen] ?? '—'}</td>
                 <td data-l="Estado"><span className={`insignia ${i.estado === 'rechazada' ? 'neutro' : i.estado === 'no_concluyente' ? 'aviso' : esSana(i.clase) ? 'ok' : 'mal'}`}>
                   {i.estado === 'diagnostico' ? (esSana(i.clase) ? 'Sana' : 'Enferma') : ESTADOS[i.estado]}</span></td>
               </tr>
@@ -66,6 +68,40 @@ export default function Historial() {
         {items && !filas.length && <p className="tenue centro relleno">No hay diagnósticos con esos filtros.</p>}
       </section>
       <p className="tenue pequeno">Solo tú ves tu historial. Se muestran tus últimos 500 diagnósticos.</p>
+      <Telefonos />
     </div>
+  )
+}
+
+// Teléfonos donde se inició sesión con la app. Lo que diagnostican sin internet llega aquí al volver la señal.
+function Telefonos() {
+  const [lista, setLista] = useState(null)
+  const [error, setError] = useState('')
+  const cargar = () => dispositivos.listar().then(setLista).catch((e) => { setError(e.message); setLista([]) })
+  useEffect(() => { cargar() }, [])
+  const desvincular = async (d) => {
+    if (!window.confirm(`¿Desvincular "${d.nombre}"? Lo ya subido se queda; lo pendiente se queda en el teléfono.`)) return
+    try { await dispositivos.desvincular(d.id); cargar() } catch (e) { setError(e.message) }
+  }
+  if (!lista?.length && !error) return null
+  return (
+    <section className="tarjeta">
+      <h3><Smartphone size={18} /> Teléfonos vinculados</h3>
+      <p className="tenue pequeno">Si pierdes un teléfono, desvincúlalo: dejará de poder subir datos a tu cuenta.</p>
+      {error && <p className="alerta mal">{error}</p>}
+      <table className="tabla">
+        <thead><tr><th>Teléfono</th><th>Vinculado</th><th>Último uso</th><th /></tr></thead>
+        <tbody>
+          {(lista ?? []).map((d) => (
+            <tr key={d.id}>
+              <td data-l="Teléfono" className="principal">{d.nombre}</td>
+              <td data-l="Vinculado">{new Date(d.creado).toLocaleDateString('es-PE', { dateStyle: 'medium' })}</td>
+              <td data-l="Último uso">{d.ultimo_uso ? new Date(d.ultimo_uso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+              <td><button className="btn sec" onClick={() => desvincular(d)}>Desvincular</button></td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   )
 }

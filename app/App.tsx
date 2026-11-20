@@ -1,19 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
-import { ActivityIndicator, FlatList, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { StatusBar } from 'expo-status-bar'
 import * as ImagePicker from 'expo-image-picker'
 import { C, brillo } from './src/tema'
-import Voz from './src/Voz'
 import Parcelas, { AnotarEnParcela } from './src/Parcelas'
-import { CULTIVOS, URGENCIA, esSana, infoClase } from './src/catalogo'
-import { Resultado, diagnosticarLocal, hayIaLocal } from './src/ia'
+import { CULTIVOS, esSana, infoClase } from './src/catalogo'
+import { Resultado, Vision, diagnosticarLocal, hayIaLocal } from './src/ia'
+import VisionIA from './src/VisionIA'
+import { Analizando, GuiaFoto, TarjetaResultado } from './src/Resultado'
 import { enLinea, enviar } from './src/servidor'
-import { Fila, borrar, guardar, listar, pendientes, sincronizar } from './src/historial'
+import { Fila, borrar, guardar, listar, pendientes, sincronizar, sincronizarSola } from './src/historial'
+import Cuenta from './src/Cuenta'
+import { cargarCuenta, cuentaActual, provinciaActual } from './src/cuenta'
 
-type Vista = 'diagnosticar' | 'historial' | 'parcelas'
+type Vista = 'diagnosticar' | 'historial' | 'parcelas' | 'cuenta'
+const PESTANAS: Record<Vista, string> = { diagnosticar: 'Diagnosticar', historial: 'Historial', parcelas: 'Parcelas', cuenta: 'Cuenta' }
 
 export default function App() {
   const [vista, setVista] = useState<Vista>('diagnosticar')
+  // Cuenta opcional: si hay sesión, la cola se sube sola cuando vuelve internet.
+  useEffect(() => { cargarCuenta(); return sincronizarSola() }, [])
   return (
     <SafeAreaView style={s.raiz}>
       <StatusBar style="light" />
@@ -21,11 +27,11 @@ export default function App() {
         <Text style={s.marca}>Fito<Text style={{ color: C.acento }}>Lens</Text></Text>
         <Text style={s.chip}>{hayIaLocal() ? '● IA en el teléfono' : '● IA en el servidor'}</Text>
       </View>
-      {vista === 'diagnosticar' ? <Diagnosticar /> : vista === 'historial' ? <Historial /> : <Parcelas />}
+      {vista === 'diagnosticar' ? <Diagnosticar /> : vista === 'historial' ? <Historial /> : vista === 'parcelas' ? <Parcelas /> : <Cuenta />}
       <View style={s.pestanas}>
-        {(['diagnosticar', 'historial', 'parcelas'] as Vista[]).map((v) => (
+        {(Object.keys(PESTANAS) as Vista[]).map((v) => (
           <Pressable key={v} onPress={() => setVista(v)} style={[s.pestana, vista === v && { borderTopColor: C.acento }]}>
-            <Text style={[s.pestanaTxt, vista === v && { color: C.acento }]}>{v === 'diagnosticar' ? 'Diagnosticar' : v === 'historial' ? 'Historial' : 'Parcelas'}</Text>
+            <Text style={[s.pestanaTxt, vista === v && { color: C.acento }]}>{PESTANAS[v]}</Text>
           </Pressable>
         ))}
       </View>
@@ -36,6 +42,8 @@ export default function App() {
 function Diagnosticar() {
   const [foto, setFoto] = useState<string | null>(null)
   const [res, setRes] = useState<Resultado | null>(null)
+  const [vision, setVision] = useState<Vision | null>(null)
+  const [proporcion, setProporcion] = useState(1)
   const [cargando, setCargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -46,12 +54,13 @@ function Diagnosticar() {
     const op: ImagePicker.ImagePickerOptions = { mediaTypes: ['images'], quality: 0.9 }
     const r = camara ? await ImagePicker.launchCameraAsync(op) : await ImagePicker.launchImageLibraryAsync(op)
     if (r.canceled) return
-    const uri = r.assets[0].uri
-    setFoto(uri); setRes(null); setCargando(true)
+    const { uri, width, height } = r.assets[0]
+    setFoto(uri); setRes(null); setVision(null); setCargando(true)
+    setProporcion(width && height ? Math.min(2, Math.max(0.5, width / height)) : 1)
     try {
       let d: Resultado
-      if (hayIaLocal()) d = await diagnosticarLocal(uri)
-      else if (await enLinea()) d = await enviar(uri)
+      if (hayIaLocal()) { const { vision: v, ...local } = await diagnosticarLocal(uri); d = local; setVision(v) }
+      else if (await enLinea()) d = await enviar(uri, provinciaActual())
       else throw new Error('Esta versión no trae la IA en el teléfono y no hay internet.')
       guardar(uri, d)
       setRes(d)
@@ -70,52 +79,17 @@ function Diagnosticar() {
           <View style={s.fila}>{Object.entries(CULTIVOS).map(([k, c]) => <Text key={k} style={[s.etiqueta, { color: c.color, borderColor: c.color + '55' }]}>{c.nombre}</Text>)}</View>
         </View>
       )}
-      {foto && <Image source={{ uri: foto }} style={s.foto} />}
+      {!foto && <GuiaFoto />}
+      {foto && <VisionIA foto={foto} proporcion={proporcion} vision={vision} cargando={cargando} />}
       <View style={s.fila}>
-        <Boton texto="Cámara" principal onPress={() => elegir(true)} />
+        <Boton texto={foto ? 'Otra foto' : 'Cámara'} principal onPress={() => elegir(true)} />
         <Boton texto="Galería" onPress={() => elegir(false)} />
       </View>
-      {cargando && <View style={s.centro}><ActivityIndicator color={C.acento} size="large" /><Text style={s.tenue}>Analizando la foto…</Text></View>}
+      {cargando && <Analizando />}
       {error && <View style={[s.tarjeta, brillo(C.coral)]}><Text style={{ color: C.coral }}>{error}</Text></View>}
-      {res && <TarjetaResultado r={res} />}
+      {res && foto && <TarjetaResultado r={res} foto={foto} vision={vision} onOtra={() => elegir(true)} />}
       {res && foto && <AnotarEnParcela key={foto} resultado={res} foto={foto} />}
     </ScrollView>
-  )
-}
-
-function TarjetaResultado({ r }: { r: Resultado }) {
-  if (r.estado !== 'diagnostico') {
-    const color = r.estado === 'rechazada' ? C.coral : C.oro
-    return (
-      <View style={[s.tarjeta, brillo(color)]}>
-        <Text style={[s.sobre, { color }]}>{r.estado === 'rechazada' ? 'FOTO NO VÁLIDA' : 'NO CONCLUYENTE'}</Text>
-        <Text style={s.texto}>{r.motivo}</Text>
-        <Voz r={r} />
-        <Text style={s.pie}>{r.ms} ms · {r.origen === 'telefono' ? 'en el teléfono' : 'en el servidor'}</Text>
-      </View>
-    )
-  }
-  const sana = esSana(r.clase!), info = infoClase(r.clase!, r.etiqueta), cultivo = CULTIVOS[r.cultivo ?? '']
-  const color = sana ? C.sana : URGENCIA[info.urgencia].color
-  return (
-    <View style={[s.tarjeta, brillo(color)]}>
-      <View style={s.fila}>
-        {cultivo && <Text style={[s.etiqueta, { color: cultivo.color, borderColor: cultivo.color + '55' }]}>{cultivo.nombre}</Text>}
-        <Text style={[s.etiqueta, { color, borderColor: color + '55' }]}>{URGENCIA[info.urgencia].texto}</Text>
-      </View>
-      <Text style={[s.titulo, { color }]}>{info.nombre}</Text>
-      {!sana && <Text style={s.cursiva}>{info.agente}</Text>}
-      <Barra valor={r.confianza ?? 0} color={color} />
-      <Text style={s.tenue}>{Math.round((r.confianza ?? 0) * 100)} % de confianza</Text>
-      <Text style={[s.sobre, { marginTop: 14 }]}>QUÉ HACER</Text>
-      <Text style={s.texto}>{info.consejo}</Text>
-      <Voz r={r} info={info} sana={sana} />
-      {r.top3.length > 1 && <>
-        <Text style={[s.sobre, { marginTop: 14 }]}>OTRAS POSIBILIDADES</Text>
-        {r.top3.slice(1).map((t) => <Text key={t.clase} style={s.tenue}>{infoClase(t.clase, t.etiqueta).nombre} · {Math.round(t.confianza * 100)} %</Text>)}
-      </>}
-      <Text style={s.pie}>Dosis: sigue la etiqueta del producto registrado en SENASA. {r.ms} ms · {r.origen === 'telefono' ? 'en el teléfono' : 'en el servidor'}</Text>
-    </View>
   )
 }
 
@@ -141,7 +115,7 @@ function Historial() {
       ListHeaderComponent={
         <View style={{ gap: 8, marginBottom: 6 }}>
           <Boton texto={enviando ? 'Enviando…' : `Sincronizar (${pend} pendientes)`} principal onPress={sinc} desactivado={enviando || pend === 0} />
-          <Text style={s.tenue}>Opcional: con internet, tus fotos ayudan al mapa de brotes de San Martín.</Text>
+          <Text style={s.tenue}>{cuentaActual() ? 'Con tu cuenta, se suben solos cuando hay internet y los ves en la web.' : 'Opcional: con internet, tus fotos ayudan al mapa de brotes de San Martín. Inicia sesión en Cuenta para verlos también en la web.'}</Text>
           {aviso && <Text style={{ color: C.acento }}>{aviso}</Text>}
         </View>
       }
@@ -156,7 +130,7 @@ function Historial() {
               <Text style={[s.texto, { fontWeight: '700' }]}>{f.clase ? infoClase(f.clase, f.etiqueta).nombre : f.estado === 'rechazada' ? 'Foto no válida' : 'No concluyente'}</Text>
               <Text style={s.tenue}>{CULTIVOS[f.cultivo ?? '']?.nombre ?? '—'} · {f.confianza ? Math.round(f.confianza * 100) + ' %' : ''} · {new Date(f.fecha).toLocaleString('es-PE')}</Text>
             </View>
-            <Text style={{ color: f.sincronizado ? C.acento : C.tenue }}>{f.sincronizado ? '☁' : '⏳'}</Text>
+            <Text style={{ color: f.sincronizado === 1 ? C.acento : f.sincronizado === 2 ? C.coral : C.tenue }}>{f.sincronizado === 1 ? '☁' : f.sincronizado === 2 ? '⚠' : '⏳'}</Text>
           </Pressable>
         )
       }}
@@ -173,10 +147,6 @@ function Boton({ texto, onPress, principal, desactivado }: { texto: string; onPr
     </Pressable>
   )
 }
-
-const Barra = ({ valor, color }: { valor: number; color: string }) => (
-  <View style={s.barra}><View style={{ width: `${Math.round(valor * 100)}%`, height: '100%', backgroundColor: color, borderRadius: 4 }} /></View>
-)
 
 const s = StyleSheet.create({
   raiz: { flex: 1, backgroundColor: C.fondo, paddingTop: 30 },

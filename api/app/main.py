@@ -8,14 +8,15 @@ from app.core.config import ajustes
 from app.core.logs import configurar_logs
 from app.db.sesion import fabrica
 from app.ia.registro import cargar
-from app.rutas import admin, alertas, auth, brotes, diagnostico, historial, metricas, parcelas, reporte, reportes, salud
+from app.rutas import (admin, alertas, auth, brotes, diagnostico, dispositivos, historial, metricas, parcelas,
+                       reporte, reportes, salud, sincronizar)
 
 
 @asynccontextmanager
 async def ciclo(app: FastAPI):
     a = ajustes()
     configurar_logs(a.log_nivel)
-    app.state.registro = cargar(a.modelos_dir, a.ort_hilos, segmentar=a.segmentacion)
+    app.state.registro = cargar(a.modelos_dir, a.ort_hilos, segmentar=a.segmentacion, volteo=a.volteo)
     with fabrica()() as sesion:
         auth.asegurar_admin(sesion)
     yield
@@ -27,7 +28,8 @@ def crear_app() -> FastAPI:
     if ajustes().cors_lista:
         app.add_middleware(CORSMiddleware, allow_origins=ajustes().cors_lista,
                            allow_methods=["*"], allow_headers=["*"])
-    for modulo in (alertas, reportes, diagnostico, reporte, metricas, brotes, auth, historial, parcelas, admin, salud):
+    for modulo in (alertas, reportes, diagnostico, sincronizar, reporte, metricas, brotes, auth, dispositivos, historial,
+                   parcelas, admin, salud):
         app.include_router(modulo.router, prefix="/api")
     return app
 

@@ -69,11 +69,35 @@ class ItemHistorial(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: int
     creado: datetime
+    origen: str
     cultivo: str | None
     estado: str
     clase: str | None
     confianza: float | None
     provincia: str | None
+
+
+class Vincular(Login):
+    nombre_dispositivo: str = Field(min_length=1, max_length=80)
+
+
+class DispositivoSalida(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    nombre: str
+    creado: datetime
+    ultimo_uso: datetime | None
+    revocado: bool
+
+
+class TokenDispositivo(Token):
+    dispositivo: DispositivoSalida
+
+
+class Sincronizado(BaseModel):
+    id: int
+    id_cliente: str
+    nuevo: bool  # False: ya estaba guardado (reenvío)
 
 
 class Historial(BaseModel):

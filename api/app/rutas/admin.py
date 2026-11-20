@@ -13,7 +13,7 @@ from app.seguridad import amenazas, auditoria, simulacion
 
 router = APIRouter(prefix="/admin", tags=["administración"], dependencies=[Depends(admin_requerido)])
 
-ACCIONES = {"login", "registro", "diagnostico", "admin"}
+ACCIONES = {"login", "registro", "diagnostico", "admin", "dispositivo"}
 ESTADOS = {"exito", "fallo", "bloqueado"}
 
 

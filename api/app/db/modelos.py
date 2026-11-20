@@ -44,6 +44,20 @@ class Diagnostico(Base):
     modelo_version: Mapped[str] = mapped_column(String(120))
     imagen_sha256: Mapped[str] = mapped_column(String(64))
     duracion_ms: Mapped[int] = mapped_column(Integer)
+    # Identificador que pone la app al diagnosticar sin internet: reenviar el mismo no crea otro registro.
+    id_cliente: Mapped[str | None] = mapped_column(String(36), unique=True)
+
+
+class Dispositivo(Base):
+    """Teléfono con la app vinculado a una cuenta. Su sesión dura más que la de la web y se puede revocar."""
+    __tablename__ = "dispositivos"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id", ondelete="CASCADE"), index=True)
+    nombre: Mapped[str] = mapped_column(String(80))
+    creado: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
+    ultimo_uso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revocado: Mapped[bool] = mapped_column(default=False)
 
 
 class Auditoria(Base):

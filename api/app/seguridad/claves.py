@@ -20,9 +20,13 @@ def verificar(password: str, hash_: str) -> bool:
         return False
 
 
-def crear_token(usuario_id: int, rol: str) -> str:
-    expira = datetime.now(timezone.utc) + timedelta(minutes=ajustes().jwt_minutos)
-    datos = {"sub": str(usuario_id), "rol": rol, "exp": expira}
+def crear_token(usuario_id: int, rol: str, dispositivo_id: int | None = None) -> str:
+    """Sin dispositivo: sesión de la web (jwt_minutos). Con dispositivo: sesión de la app (jwt_dias_dispositivo)."""
+    a = ajustes()
+    duracion = timedelta(days=a.jwt_dias_dispositivo) if dispositivo_id else timedelta(minutes=a.jwt_minutos)
+    datos = {"sub": str(usuario_id), "rol": rol, "exp": datetime.now(timezone.utc) + duracion}
+    if dispositivo_id:
+        datos["dis"] = dispositivo_id
     return jwt.encode(datos, ajustes().jwt_secreto, algorithm=ALGORITMO)
 
 

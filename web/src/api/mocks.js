@@ -123,6 +123,7 @@ export async function historial() {
       cultivo: estado === 'rechazada' ? null : clase.split('_')[0], estado,
       clase: estado === 'rechazada' ? null : clase, confianza: estado === 'no_concluyente' ? 0.45 + r : 0.8 + r * 0.19,
       provincia: PROV_IDS[i % PROV_IDS.length],
+      origen: i % 3 === 0 ? 'app' : 'web',
     }
   })
   return { items }

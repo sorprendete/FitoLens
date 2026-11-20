@@ -1,0 +1,52 @@
+{
+ "plantdoc": {
+  "n": 236,
+  "sin_volteo": {
+   "duda": 46,
+   "bien": 173,
+   "mal": 17
+  },
+  "con_volteo": {
+   "duda": 46,
+   "bien": 176,
+   "mal": 14
+  },
+  "cambios": {
+   "mal->duda": 4,
+   "duda->bien": 4,
+   "bien->duda": 1,
+   "bien->mal": 1,
+   "mal->bien": 1,
+   "duda->mal": 1
+  },
+  "fotos_que_usaron_volteo": 55
+ },
+ "muestras": {
+  "n": 93,
+  "sin_volteo": {
+   "bien": 58,
+   "duda": 27,
+   "mal": 8
+  },
+  "con_volteo": {
+   "bien": 58,
+   "duda": 28,
+   "mal": 7
+  },
+  "cambios": {
+   "mal->duda": 2,
+   "duda->mal": 1
+  },
+  "fotos_que_usaron_volteo": 21
+ },
+ "ms_sin_volteo": {
+  "p50": 313,
+  "p95": 503,
+  "promedio": 257
+ },
+ "ms_con_volteo": {
+  "p50": 348,
+  "p95": 613,
+  "promedio": 295
+ }
+}

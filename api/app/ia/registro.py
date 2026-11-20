@@ -13,10 +13,11 @@ log = logging.getLogger("fitolens.ia")
 
 class Registro:
     def __init__(self, modelos: dict[str, ModeloOnnx], errores: dict[str, str],
-                 segmentador: Segmentador | None = None):
+                 segmentador: Segmentador | None = None, volteo: bool = True):
         self.modelos = modelos
         self.errores = errores
         self.segmentador = segmentador  # None = sin contorno de hoja; el diagnóstico funciona igual
+        self.volteo = volteo  # si duda, mira también la foto volteada (ver pipeline.LIMITE_VOLTEO)
 
     @property
     def router(self) -> ModeloOnnx | None:
@@ -39,7 +40,7 @@ def calentar(modelo: ModeloOnnx) -> int:
     return round((time.perf_counter() - inicio) * 1000)
 
 
-def cargar(directorio: Path, hilos: int, segmentar: bool = True) -> Registro:
+def cargar(directorio: Path, hilos: int, segmentar: bool = True, volteo: bool = True) -> Registro:
     modelos, errores = {}, {}
     for carpeta in sorted(p for p in directorio.glob("*") if (p / "manifest.json").exists()):
         try:
@@ -52,4 +53,4 @@ def cargar(directorio: Path, hilos: int, segmentar: bool = True) -> Registro:
             log.error("No se pudo cargar %s: %s", carpeta.name, e)
     if not any(m.manifest.tipo == "router" for m in modelos.values()):
         log.warning("No hay router en %s: /api/diagnostico responderá 503", directorio)
-    return Registro(modelos, errores, Segmentador.cargar(hilos) if segmentar else None)
+    return Registro(modelos, errores, Segmentador.cargar(hilos) if segmentar else None, volteo)

@@ -50,10 +50,22 @@ class ModeloOnnx:
         x = np.asarray(imagen.convert("RGB").resize((e.ancho, e.alto), Image.BILINEAR), dtype=np.float32)
         return (x / 255.0).transpose(2, 0, 1)[None]
 
-    def predecir(self, imagen: Image.Image) -> Salida:
+    def predecir(self, imagen: Image.Image, volteada: bool = False) -> Salida:
+        """volteada=True mira la foto de cabeza (arriba-abajo) y devuelve el CAM ya enderezado."""
+        x = self.preprocesar(imagen)
+        if volteada:
+            x = np.ascontiguousarray(x[:, :, ::-1])
         salidas = [self.manifest.salidas.logits] + ([self.salida_cam] if self.salida_cam else [])
-        resultado = self.sesion.run(salidas, {self.entrada: self.preprocesar(imagen)})
-        return Salida(logits=resultado[0][0], cam=resultado[1][0] if self.salida_cam else None)
+        resultado = self.sesion.run(salidas, {self.entrada: x})
+        cam = resultado[1][0] if self.salida_cam else None
+        if cam is not None and volteada:
+            cam = cam[:, ::-1].copy()
+        return Salida(logits=resultado[0][0], cam=cam)
+
+
+def promedio(a: Salida, b: Salida) -> Salida:
+    cam = (a.cam + b.cam) / 2 if a.cam is not None and b.cam is not None else a.cam
+    return Salida(logits=(a.logits + b.logits) / 2, cam=cam)
 
 
 def softmax(logits: np.ndarray, temperatura: float) -> np.ndarray:

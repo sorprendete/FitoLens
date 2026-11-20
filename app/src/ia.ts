@@ -1,18 +1,25 @@
 // Diagnóstico sin internet: router (¿qué cultivo?) → especialista del cultivo. Misma lógica que api/app/ia/pipeline.py.
+// En paralelo, U2-Net-p ubica la hoja (solo para dibujar el contorno y recortar el mapa de calor: no cambia el diagnóstico).
 import { Asset } from 'expo-asset'
 import { NombreModelo, archivo, manifest } from './modelos'
 import { aTensor } from './imagen'
+import { ATENCION_MIN_DENTRO, LADO, Punto, Segmentacion, analizar, aptaPara, fraccionDentro, mapaCalor } from './vision'
 
+export type Paso = { id: string; titulo: string; detalle: string; ms: number }
 export type Resultado = {
   estado: 'diagnostico' | 'no_concluyente' | 'rechazada'
   cultivo: string | null; clase: string | null; etiqueta: string | null; confianza: number | null
   top3: { clase: string; etiqueta: string; confianza: number }[]
   motivo: string | null; ms: number; version: string; origen: 'telefono' | 'servidor'
+  pasos?: Paso[]
 }
+// "Visión de la IA": va aparte del resultado para no llenar el historial con imágenes.
+export type Vision = { calor: string | null; contorno: Punto[][] }
 
 type Clase = { id: string; etiqueta?: string; nombre?: string; cultivo?: string | null }
 type Manifest = {
   version: string; clases: Clase[]; entrada: { alto: number; ancho: number }
+  salidas?: { cam?: string; cam_tam?: [number, number] }
   temperatura?: number; umbral?: number; rechazo?: string[]; especialistas?: Record<string, string>
 }
 
@@ -24,27 +31,54 @@ const MOTIVOS = {
   especialista_duda: 'El modelo no está seguro. Puede ser un problema que no conoce o una foto poco clara. No se emite diagnóstico para evitar un error.',
 }
 const ESPECIALISTAS = { pimiento: 'hortalizas', papa: 'hortalizas', tomate: 'hortalizas', cafe: 'cafe', cacao: 'cacao' }
+const NOMBRES_CULTIVO: Record<string, string> = { pimiento: 'pimiento', papa: 'papa', tomate: 'tomate', cafe: 'café', cacao: 'cacao' }
+const pct = (v: number) => `${Math.round(v * 100)} %`
 
 // onnxruntime es nativo: no existe en Expo Go. Ahí la app diagnostica con el servidor.
 let ort: typeof import('onnxruntime-react-native') | null = null
 try { ort = require('onnxruntime-react-native'); if (!ort?.InferenceSession) ort = null } catch { ort = null }
 export const hayIaLocal = () => ort !== null
 
-const sesiones: Partial<Record<NombreModelo, any>> = {}
-async function sesion(nombre: NombreModelo) {
+const SEGMENTADOR = require('../assets/recursos/u2netp_192.onnx')
+const sesiones: Record<string, any> = {}
+async function sesion(nombre: string, recurso: number) {
   if (!sesiones[nombre]) {
-    const [a] = await Asset.loadAsync(archivo(nombre))
+    const [a] = await Asset.loadAsync(recurso)
     sesiones[nombre] = await ort!.InferenceSession.create((a.localUri ?? a.uri).replace('file://', ''))
   }
   return sesiones[nombre]
 }
 
-async function logits(nombre: NombreModelo, uri: string): Promise<number[]> {
+type Tensor = (alto: number, ancho: number) => Promise<Float32Array>
+type Salida = { logits: number[]; cam: Float32Array | null; camTam: [number, number] }
+
+async function predecir(nombre: NombreModelo, tensor: Tensor): Promise<Salida> {
   const m: Manifest = manifest(nombre)
   const { alto, ancho } = m.entrada
-  const s = await sesion(nombre)
-  const salida = await s.run({ imagen: new ort!.Tensor('float32', await aTensor(uri, alto, ancho), [1, 3, alto, ancho]) }, ['logits'])
-  return Array.from(salida.logits.data as Float32Array)
+  const s = await sesion(nombre, archivo(nombre))
+  const entrada = { imagen: new ort!.Tensor('float32', await tensor(alto, ancho), [1, 3, alto, ancho]) }
+  const nombreCam = m.salidas?.cam
+  if (nombreCam && s.outputNames?.includes(nombreCam)) {
+    try {
+      const o = await s.run(entrada, ['logits', nombreCam])
+      const dims = o[nombreCam].dims as number[]
+      return { logits: Array.from(o.logits.data as Float32Array), cam: o[nombreCam].data as Float32Array, camTam: [dims[2], dims[3]] }
+    } catch { /* sin mapa de calor, el diagnóstico sigue */ }
+  }
+  const o = await s.run(entrada, ['logits'])
+  return { logits: Array.from(o.logits.data as Float32Array), cam: null, camTam: [0, 0] }
+}
+
+const MEDIA = [0.485, 0.456, 0.406], DESVIO = [0.229, 0.224, 0.225]
+async function ubicarHoja(tensor: Tensor): Promise<Segmentacion | null> {
+  try {
+    const x = new Float32Array(await tensor(LADO, LADO)), n = LADO * LADO
+    for (let c = 0; c < 3; c++) for (let i = 0; i < n; i++) x[c * n + i] = (x[c * n + i] - MEDIA[c]) / DESVIO[c]
+    const s = await sesion('segmentador', SEGMENTADOR)
+    const o = await s.run({ [s.inputNames[0]]: new ort!.Tensor('float32', x, [1, 3, LADO, LADO]) })
+    const p = Float32Array.from(o[s.outputNames[0]].data as Float32Array, (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0))
+    return analizar(p)
+  } catch { return null } // nunca rompe un diagnóstico
 }
 
 const softmax = (x: number[], t = 1) => {
@@ -53,15 +87,26 @@ const softmax = (x: number[], t = 1) => {
 }
 const etiqueta = (c: Clase) => c.etiqueta ?? c.nombre ?? c.id
 
-export async function diagnosticarLocal(uri: string): Promise<Resultado> {
+export async function diagnosticarLocal(uri: string): Promise<Resultado & { vision: Vision }> {
   const t0 = Date.now()
+  let vuelta = t0
+  const reloj = () => { const a = Date.now(), d = a - vuelta; vuelta = a; return d }
   const mr: Manifest = manifest('router')
-  const r: Resultado = { estado: 'rechazada', cultivo: null, clase: null, etiqueta: null, confianza: null, top3: [], motivo: null, ms: 0, version: mr.version, origen: 'telefono' }
+  const vision: Vision = { calor: null, contorno: [] }
+  const r: Resultado & { vision: Vision } = { estado: 'rechazada', cultivo: null, clase: null, etiqueta: null, confianza: null,
+    top3: [], motivo: null, ms: 0, version: mr.version, origen: 'telefono', pasos: [], vision }
+  const paso = (id: string, titulo: string, detalle: string, ms: number) => r.pasos!.push({ id, titulo, detalle, ms })
   const fin = () => ((r.ms = Date.now() - t0), r)
 
+  // La foto se convierte una sola vez por tamaño (router y especialistas usan el mismo).
+  const tensores: Record<string, Promise<Float32Array>> = {}
+  const tensor: Tensor = (alto, ancho) => (tensores[`${alto}x${ancho}`] ??= aTensor(uri, alto, ancho))
+  const hoja = ubicarHoja(tensor).then((s) => ({ s, ms: Date.now() - t0 }))
+
   // 1. Router: ¿qué cultivo es?
-  const pr = softmax(await logits('router', uri), mr.temperatura ?? 1)
+  const pr = softmax((await predecir('router', tensor)).logits, mr.temperatura ?? 1)
   const i = pr.indexOf(Math.max(...pr)), cultivo = mr.clases[i].id
+  paso('router', '¿Qué planta es?', `${etiqueta(mr.clases[i])} con ${pct(pr[i])} de confianza`, reloj())
   if ((mr.rechazo ?? ['otra_planta', 'no_planta']).includes(cultivo)) return (r.motivo = MOTIVOS[cultivo as 'no_planta'] ?? MOTIVOS.otra_planta), fin()
   if (pr[i] < (mr.umbral ?? 0.6)) return (r.estado = 'no_concluyente'), (r.motivo = MOTIVOS.router_duda), fin()
   r.cultivo = cultivo
@@ -70,15 +115,41 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado> {
   const nombre = ((mr.especialistas ?? ESPECIALISTAS) as Record<string, string>)[cultivo] as NombreModelo
   const me: Manifest | null = manifest(nombre)
   if (!me) return (r.estado = 'no_concluyente'), (r.motivo = MOTIVOS.sin_especialista), fin()
-  const l = await logits(nombre, uri)
+  const salida = await predecir(nombre, tensor)
   const idx = me.clases.map((c, k) => (c.cultivo ?? c.id.split('_')[0]) === cultivo ? k : -1).filter((k) => k >= 0)
-  const p = softmax(idx.map((k) => l[k]), me.temperatura ?? 1)
+  const p = softmax(idx.map((k) => salida.logits[k]), me.temperatura ?? 1)
+  paso('especialista', `Modelo de ${NOMBRES_CULTIVO[cultivo] ?? cultivo}`, `Compara la foto con ${idx.length} condiciones que conoce`, reloj())
+
+  // 3. Calibración y umbral
   const orden = p.map((v, j) => [v, idx[j]] as const).sort((a, b) => b[0] - a[0])
   r.top3 = orden.slice(0, 3).map(([v, k]) => ({ clase: me.clases[k].id, etiqueta: etiqueta(me.clases[k]), confianza: v }))
-  const [conf, k] = orden[0]
+  const [conf, mejor] = orden[0]
   r.confianza = conf
   r.version = `${mr.version} + ${nombre} ${me.version}`
-  if (conf < (me.umbral ?? 0.6)) return (r.estado = 'no_concluyente'), (r.motivo = MOTIVOS.especialista_duda), fin()
-  r.estado = 'diagnostico'; r.clase = me.clases[k].id; r.etiqueta = etiqueta(me.clases[k])
+  const umbral = me.umbral ?? 0.6
+  paso('calibracion', '¿Qué tan segura está?', `Confianza calibrada ${pct(conf)}; mínimo exigido ${pct(umbral)}`, reloj())
+  if (conf < umbral) { r.estado = 'no_concluyente'; r.motivo = MOTIVOS.especialista_duda }
+  else { r.estado = 'diagnostico'; r.clase = me.clases[mejor].id; r.etiqueta = etiqueta(me.clases[mejor]) }
+
+  // 4. Dónde está la hoja (se calculó en paralelo; solo para mostrar)
+  const { s: seg, ms } = await hoja
+  reloj()
+  let mascara = seg?.ok ? seg.mascara : null
+  let detalle = mascara ? `Ubicó la planta: ocupa el ${pct(seg!.cobertura)} de la foto` : 'No se pudo separar la planta del fondo con seguridad; se usa la foto completa'
+  if (mascara && !aptaPara(seg!, cultivo)) { mascara = null; detalle = 'La forma ubicada no parece una sola mazorca; se usa la foto completa' }
+  const [h, w] = salida.camTam
+  if (mascara && salida.cam && fraccionDentro(salida.cam, mejor, h, w, mascara) < ATENCION_MIN_DENTRO) {
+    mascara = null; detalle = 'La IA miró sobre todo fuera de la zona ubicada; se muestra la foto completa'
+  }
+  paso('segmentacion', '¿Dónde está la hoja?', detalle, ms)
+  if (mascara) vision.contorno = seg!.contorno
+
+  // 5. Mapa de calor de la clase ganadora (solo sobre la hoja si se ubicó)
+  if (salida.cam) {
+    try {
+      vision.calor = mapaCalor(salida.cam, mejor, h, w, mascara)
+      paso('mapa_calor', '¿Dónde miró?', 'Las zonas rojas son las que más pesaron en la decisión', reloj())
+    } catch { /* sin mapa de calor */ }
+  }
   return fin()
 }

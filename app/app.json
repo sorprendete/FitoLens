@@ -32,6 +32,7 @@
     "plugins": [
       "onnxruntime-react-native",
       "expo-sqlite",
+      "expo-secure-store",
       ["expo-image-picker", { "cameraPermission": "FitoLens usa la cámara para fotografiar hojas y mazorcas y diagnosticarlas." }],
       ["expo-build-properties", { "android": { "minSdkVersion": 24 }, "ios": { "deploymentTarget": "16.4" } }]
     ],

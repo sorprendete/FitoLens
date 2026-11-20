@@ -29,3 +29,4 @@ Thumbs.db
 
 # Modelo de segmentación de la hoja (pequeño, va con el código)
 !api/app/ia/recursos/*.onnx
+!app/assets/recursos/*.onnx

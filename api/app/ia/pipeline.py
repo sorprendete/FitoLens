@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 from app.ia import mapa_calor
-from app.ia.modelo import softmax
+from app.ia.modelo import promedio, softmax
 from app.ia.registro import Registro
 from app.ia.segmentacion import Segmentacion, Segmentador, apta_para
 
@@ -21,8 +21,13 @@ ESPERA_MAXIMA_S = 2.0  # si se demora más, se sigue sin ella
 # marcó otro objeto (por ejemplo una hoja en vez de la mazorca): se muestra el mapa completo, como antes.
 ATENCION_MIN_DENTRO = 0.4
 _POR_DEFECTO = object()
+# Si la confianza queda por debajo de esto, el modelo mira también la foto volteada arriba-abajo y se
+# promedian ambas (el espejo izquierda-derecha ya va dentro de cada ONNX). Solo ~1 de cada 5 fotos lo
+# necesita, así que en promedio suma ~40 ms. Medido en pruebas/volteo (README ahí). VOLTEO=false lo apaga.
+LIMITE_VOLTEO = 0.7
 
 NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao"}
+_VOLTEO = "; como dudaba, revisó también la foto de cabeza"
 MOTIVOS = {
     "no_planta": "La foto no parece una planta. Toma la foto de cerca a una hoja o mazorca, con buena luz.",
     "otra_planta": "Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café y cacao.",
@@ -107,11 +112,15 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
 
     # 1. Router: ¿qué cultivo es?
     m = router.manifest
-    p = softmax(router.predecir(imagen).logits, m.temperatura)
+    logits = router.predecir(imagen).logits
+    p = softmax(logits, m.temperatura)
+    volteo = registro.volteo and p.max() < LIMITE_VOLTEO
+    if volteo:
+        p = softmax((logits + router.predecir(imagen, volteada=True).logits) / 2, m.temperatura)
     i = int(np.argmax(p))
     cultivo, conf = m.ids[i], float(p[i])
     _paso(r, "router", "¿Qué planta es?",
-          f"{m.clases[i].etiqueta} con {conf:.0%} de confianza", reloj.vuelta())
+          f"{m.clases[i].etiqueta} con {conf:.0%} de confianza" + (_VOLTEO if volteo else ""), reloj.vuelta())
     if cultivo in m.rechazo:
         r.motivo = MOTIVOS.get(cultivo, MOTIVOS["otra_planta"])
         return r
@@ -130,11 +139,16 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     em = esp.manifest
     # Si el especialista cubre varios cultivos, solo cuentan las clases del cultivo elegido.
     indices = [k for k, c in enumerate(em.clases) if c.cultivo in (None, cultivo)]
+    p = softmax(salida.logits[indices], em.temperatura)
+    volteo = registro.volteo and p.max() < LIMITE_VOLTEO
+    if volteo:
+        salida = promedio(salida, esp.predecir(imagen, volteada=True))
+        p = softmax(salida.logits[indices], em.temperatura)
     _paso(r, "especialista", f"Modelo de {NOMBRES_CULTIVO.get(cultivo, cultivo)}",
-          f"Compara la foto con {len(indices)} condiciones que conoce", reloj.vuelta())
+          f"Compara la foto con {len(indices)} condiciones que conoce" + (_VOLTEO if volteo else ""),
+          reloj.vuelta())
 
     # 3. Calibración y umbral
-    p = softmax(salida.logits[indices], em.temperatura)
     orden = np.argsort(p)[::-1]
     r.top3 = [{"clase": em.clases[indices[k]].id, "etiqueta": em.clases[indices[k]].etiqueta,
                "confianza": round(float(p[k]), 4)} for k in orden[:3]]

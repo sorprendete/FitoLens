@@ -20,7 +20,9 @@ tests/         pytest con SQLite y modelos falsos
 
 Flujo de `POST /api/diagnostico`: foto validada → **router** (¿qué cultivo?; rechaza otra planta o no planta) → **especialista** del cultivo → **calibración** (softmax con temperatura y umbral; por debajo, "no concluyente") → **mapa de calor** (CAM de la clase ganadora) → se guarda en `diagnosticos`.
 
-**Ubicación de la hoja** (`app/ia/segmentacion.py`): U2-Net-p (4.6 MB, Apache 2.0, ONNX de rembg fijado a 192 px, en `app/ia/recursos/`) corre en un hilo paralelo al router y al especialista (~80 ms en CPU; añade ~1 ms al total). Devuelve `mascara_ok` y `contorno_hoja` (polígonos `[x, y]` en 0-1) y recorta el mapa de calor a la hoja. El clasificador sigue viendo la foto completa: la segmentación no cambia ningún diagnóstico. Respaldo seguro (`mascara_ok=false`, foto completa como antes) si el modelo falta o falla, si tarda más de 2 s, si la máscara es vacía, menor al 2 % o mayor al 95 % de la foto, si su nitidez es menor a 0.85, o si menos del 40 % de la atención del modelo cae dentro de ella. `SEGMENTACION=false` la apaga.
+**Foto volteada cuando duda** (`VOLTEO`, `pipeline.LIMITE_VOLTEO`): cada ONNX ya promedia la foto con su espejo izquierda-derecha. Si el router o el especialista quedan por debajo de 70 % de confianza, se repite con la foto de cabeza y se promedian los logits (y el mapa de calor, ya enderezado). Lo usa ~1 de cada 5 fotos. En las 236 fotos de campo de PlantDoc test: errores 17 → 14, aciertos 173 → 176; +38 ms en promedio (p95 +110 ms). Giros de 90° y recortes no ayudaron. Medición: `pruebas/volteo/medir.py`.
+
+**Ubicación de la hoja** (`app/ia/segmentacion.py`): U2-Net-p (4.6 MB, Apache 2.0, ONNX de rembg fijado a 192 px, en `app/ia/recursos/`) corre en un hilo paralelo al router y al especialista (~80 ms en CPU; añade ~1 ms al total). Devuelve `mascara_ok` y `contorno_hoja` (polígonos `[x, y]` en 0-1) y recorta el mapa de calor a la hoja. El clasificador sigue viendo la foto completa: la segmentación no cambia ningún diagnóstico. Respaldo seguro (`mascara_ok=false`, foto completa como antes) si el modelo falta o falla, si tarda más de 2 s, si la máscara es vacía, menor al 2 % o mayor al 95 % de la foto, si su nitidez es menor a 0.66 (o el núcleo seguro menor a 75 %), si en cacao la forma no es convexa como una mazorca (solidez < 0.75), o si menos del 40 % de la atención del modelo cae dentro de ella. `SEGMENTACION=false` la apaga.
 
 ## Endpoints
 
@@ -32,6 +34,8 @@ Flujo de `POST /api/diagnostico`: foto validada → **router** (¿qué cultivo?;
 | GET | `/api/brotes?desde=YYYY-MM-DD` | no |
 | POST | `/api/auth/login` · `/api/auth/registro` · GET `/api/auth/yo` | — |
 | GET | `/api/historial?limite=50` | sí (admin ve todo) |
+| POST | `/api/dispositivos` `{email, password, nombre_dispositivo}` → token de la app (dura `JWT_DIAS_DISPOSITIVO`, 90 días) · GET `/api/dispositivos` · DELETE `/api/dispositivos/{id}` (desvincular) | — / sí |
+| POST | `/api/sincronizar` (multipart: `imagen`, `id_cliente`, `estado`, `fecha`, opcionales `cultivo`, `clase`, `confianza`, `modelo_version`, `duracion_ms`, `provincia`, `latitud`, `longitud`) → `{id, id_cliente, nuevo}`. Guarda el resultado del teléfono con la fecha de la foto; el mismo `id_cliente` no se duplica | sí |
 | GET | `/api/admin/resumen` · `/api/admin/usuarios` · `/api/admin/auditoria?limite&desde&accion&estado` · `/api/admin/amenazas?dias&simulado` | admin |
 | POST | `/api/admin/usuarios/{id}/estado` `{activo}` | admin |
 | GET | `/api/salud` | no |
@@ -59,6 +63,8 @@ Provincias válidas: bellavista, el_dorado, huallaga, lamas, mariscal_caceres, m
 | `REGISTRO_ABIERTO` | false | Permite crear cuentas desde la web |
 | `MODELOS_DIR` | `/modelos` | Carpeta de modelos (ver `docs/contrato_modelos.md`) |
 | `ORT_HILOS` | 2 | Hilos de ONNX Runtime por modelo |
+| `VOLTEO` | true | Si el modelo duda (confianza < 70 %), mira también la foto volteada arriba-abajo y promedia |
+| `SEGMENTACION` | true | Ubica la hoja para el contorno y el mapa de calor |
 | `API_WORKERS` | 2 | Procesos de uvicorn |
 | `MAX_IMAGEN_MB` | 8 | Tamaño máximo de foto |
 | `LIMITE_DIAGNOSTICOS_MINUTO` | 20 | Fotos por minuto por IP |

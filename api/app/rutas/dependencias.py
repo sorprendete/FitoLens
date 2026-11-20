@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.seguridad.claves import leer_token
-from app.db.modelos import Usuario
+from app.db.modelos import Dispositivo, Usuario, ahora
 from app.db.sesion import db
 from app.ia.registro import Registro
 
@@ -22,6 +22,11 @@ def usuario_opcional(cred: HTTPAuthorizationCredentials | None = Depends(_bearer
     usuario = sesion.get(Usuario, int(datos["sub"])) if datos else None
     if usuario is None or not usuario.activo:
         raise HTTPException(401, "Sesión inválida o vencida.")
+    if datos.get("dis"):  # token de la app: el dispositivo tiene que seguir vinculado
+        d = sesion.get(Dispositivo, int(datos["dis"]))
+        if d is None or d.revocado or d.usuario_id != usuario.id:
+            raise HTTPException(401, "Este teléfono ya no está vinculado. Vuelve a iniciar sesión.")
+        d.ultimo_uso = ahora()
     return usuario
 
 

@@ -98,3 +98,22 @@ def test_historial_por_usuario(cliente):
     assert len(cliente.get("/api/historial", headers=ana).json()["items"]) == 1
     assert len(cliente.get("/api/historial", headers=token(cliente)).json()["items"]) == 2
     assert cliente.get("/api/historial").status_code == 401
+
+
+def test_volteo_solo_si_esta_encendido(tmp_path):
+    from PIL import Image
+    import crear_modelos_falsos
+    from app.ia import pipeline
+    from app.ia.registro import cargar
+    crear_modelos_falsos.crear_todos(tmp_path)
+    reg = cargar(tmp_path, 1, segmentar=False)
+    img = Image.new("RGB", (64, 64), (40, 140, 50))
+    reg.volteo = False
+    pipeline.LIMITE_VOLTEO, antes = 1.01, pipeline.LIMITE_VOLTEO
+    try:
+        assert not any("de cabeza" in p["detalle"] for p in pipeline.diagnosticar(reg, img).pasos)
+        reg.volteo = True
+        r = pipeline.diagnosticar(reg, img)
+        assert any("de cabeza" in p["detalle"] for p in r.pasos)
+    finally:
+        pipeline.LIMITE_VOLTEO = antes
