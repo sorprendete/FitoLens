@@ -1,4 +1,4 @@
-import { Apple, CloudOff, Download, HardDrive, RefreshCw, ShieldCheck, Smartphone, WifiOff } from 'lucide-react'
+import { Download, HardDrive, RefreshCw, ShieldCheck, Smartphone, WifiOff } from 'lucide-react'
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 import './AppMovil.css'
@@ -52,7 +52,7 @@ export default function AppMovil() {
         <Smartphone className="am-icono" size={64} strokeWidth={1.4} aria-hidden="true" />
       </section>
 
-      <div className="rejilla-2">
+      <div>
         <section className="tarjeta am-plataforma">
           <div className="tarjeta-cab">
             <h3><Smartphone size={18} />Android</h3>
@@ -78,15 +78,6 @@ export default function AppMovil() {
           </div>
         </section>
 
-        <section className="tarjeta am-plataforma">
-          <div className="tarjeta-cab">
-            <h3><Apple size={18} />iPhone</h3>
-            <span className="insignia neutro">Próximamente</span>
-          </div>
-          <p>La versión para iPhone está lista en el código, pero Apple solo permite instalarla a través de su tienda o de TestFlight.</p>
-          <p className="tenue">Mientras tanto, desde el iPhone puedes usar FitoLens en esta misma web: abre el menú y entra a <a className="enlace" href="#diagnostico">Diagnóstico</a>.</p>
-          <p className="pequeno tenue am-datos"><CloudOff size={14} />En la web el diagnóstico necesita internet.</p>
-        </section>
       </div>
 
       <section className="tarjeta">
