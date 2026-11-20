@@ -588,3 +588,12 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 @keyframes borde-brote { from { stroke-opacity: 1; } to { stroke-opacity: .35; } }
 @media (max-width: 560px) { .alerta-item { flex-wrap: wrap; } .alerta-meta { text-align: left; width: 100%; padding-left: 24px; display: flex; gap: 12px; } }
 @media (prefers-reduced-motion: reduce) { .alerta-pulso, .mapa path.en-alerta { animation: none; } }
+
+/* ---------- Visión de la IA (mapa de calor) ---------- */
+.vision-toggle { margin-bottom: 10px; }
+.marco .capa { mix-blend-mode: normal; transition: opacity .35s ease; }
+.vision-pie { display: grid !important; gap: 8px; }
+.vision-leyenda { display: flex; align-items: center; gap: 10px; font-size: .82rem; color: var(--tenue); }
+.vision-leyenda i { flex: 1; height: 10px; border-radius: 99px; background: linear-gradient(90deg, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000); }
+.vision-opacidad { display: flex; align-items: center; gap: 10px; font-size: .82rem; color: var(--tenue); }
+.vision-opacidad input { flex: 1; accent-color: var(--acento); }
