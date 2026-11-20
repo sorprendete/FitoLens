@@ -6,10 +6,11 @@ FastAPI + ONNX Runtime (CPU) + PostgreSQL. Documentación interactiva en `/api/d
 
 ```
 app/
-├─ core/       config.py (todo sale del .env) · seguridad.py (bcrypt, JWT, límite por IP) · logs.py
+├─ core/       config.py (todo sale del .env) · logs.py
+├─ seguridad/  claves (bcrypt, JWT) · limites (fotos por IP) · fuerza_bruta · auditoria · amenazas (reglas + Isolation Forest) · simulacion
 ├─ db/         modelos.py (tablas) · sesion.py (conexión)
 ├─ ia/         manifest.py · modelo.py (un ONNX) · registro.py (carga modelos/) · pipeline.py · mapa_calor.py · imagen.py
-├─ rutas/      diagnostico · metricas · brotes · auth · historial · salud
+├─ rutas/      diagnostico · metricas · brotes · auth · historial · admin · salud
 ├─ esquemas.py formas de entrada y salida
 └─ main.py
 alembic/       migraciones de la base de datos
@@ -28,7 +29,19 @@ Flujo de `POST /api/diagnostico`: foto validada → **router** (¿qué cultivo?;
 | GET | `/api/brotes?desde=YYYY-MM-DD` | no |
 | POST | `/api/auth/login` · `/api/auth/registro` · GET `/api/auth/yo` | — |
 | GET | `/api/historial?limite=50` | sí (admin ve todo) |
+| GET | `/api/admin/resumen` · `/api/admin/usuarios` · `/api/admin/auditoria?limite&desde&accion&estado` · `/api/admin/amenazas?dias&simulado` | admin |
+| POST | `/api/admin/usuarios/{id}/estado` `{activo}` | admin |
 | GET | `/api/salud` | no |
+
+## Seguridad
+
+- **Contraseñas** con bcrypt; sesión con JWT firmado (`JWT_SECRETO`). El rol y si la cuenta está activa se leen de la base en cada petición: desactivar una cuenta o quitarle el rol admin surte efecto al instante.
+- **Fuerza bruta**: 5 fallos del mismo correo o 20 desde la misma IP en 15 min → 429 y evento `bloqueado`. El umbral por IP es más alto porque en la feria muchos comparten el mismo wifi. Se cuenta en la tabla `auditoria`, así vale para todos los procesos y sobrevive a reinicios.
+- **Límite de fotos** por IP y minuto (`LIMITE_DIAGNOSTICOS_MINUTO`).
+- **Validación de imágenes**: tipo real por firma (JPG, PNG, WebP), tamaño, bombas de descompresión y archivos dañados.
+- **Integridad de modelos**: cada `model.onnx` se verifica con el SHA-256 de su manifest; si no coincide, no se carga.
+- **Auditoría**: login, registro, diagnóstico y acciones de admin, con IP y navegador. La IP se toma de la última entrada de `X-Forwarded-For` (la que pone Caddy), así el cliente no puede falsificarla.
+- **Detección de amenazas**: reglas (fuerza bruta, prueba de contraseñas en muchas cuentas, sondeo del modelo, ráfagas, creación masiva de cuentas, scripts) + Isolation Forest no supervisado sobre la auditoría. `simulado=true` usa tráfico de prueba para la demo.
 
 Provincias válidas: bellavista, el_dorado, huallaga, lamas, mariscal_caceres, moyobamba, picota, rioja, san_martin, tocache.
 
@@ -46,6 +59,7 @@ Provincias válidas: bellavista, el_dorado, huallaga, lamas, mariscal_caceres, m
 | `API_WORKERS` | 2 | Procesos de uvicorn |
 | `MAX_IMAGEN_MB` | 8 | Tamaño máximo de foto |
 | `LIMITE_DIAGNOSTICOS_MINUTO` | 20 | Fotos por minuto por IP |
+| `LOGIN_MAX_FALLOS` / `LOGIN_MAX_FALLOS_IP` / `LOGIN_BLOQUEO_MINUTOS` | 5 / 20 / 15 | Bloqueo por fuerza bruta |
 | `GUARDAR_IMAGENES` / `IMAGENES_DIR` | false / `/datos/imagenes` | Guarda fotos de campo para reentrenar |
 | `CORS_ORIGENES` | vacío | Solo si la web está en otro dominio |
 | `LOG_NIVEL` | INFO | |

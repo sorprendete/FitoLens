@@ -10,4 +10,5 @@ pyjwt==2.15.0
 bcrypt==5.0.0
 onnxruntime==1.29.0
 numpy==2.5.3
+scikit-learn==1.9.1
 pillow==12.3.0

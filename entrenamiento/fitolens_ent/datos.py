@@ -24,52 +24,72 @@ def log(*a):
 
 
 # ------------------------------------------------------------ descarga
-def _bajar(url, destino):
+def _bajar(urls, destino):
     os.makedirs(os.path.dirname(destino), exist_ok=True)
-    subprocess.run(["wget", "-q", "--tries=3", "-O", destino, url], check=True)
+    for url in urls:
+        r = subprocess.run(["wget", "-q", "-c", "--tries=5", "--waitretry=30", "-O", destino, url])
+        if r.returncode == 0 and zipfile.is_zipfile(destino):
+            return
+        log(f"falló {url} (código {r.returncode})")
+    raise RuntimeError("ninguna URL funcionó")
 
 
-def _descomprimir(zip_path, carpeta, extraer=None):
+def _descomprimir(zip_path, carpeta, extraer=None, borrar=True):
     with zipfile.ZipFile(zip_path) as z:
         miembros = [m for m in z.namelist() if not extraer or any(p in m for p in extraer)]
         z.extractall(carpeta, members=miembros)
-    os.remove(zip_path)
+    if borrar:
+        os.remove(zip_path)
     for interno in glob.glob(os.path.join(carpeta, "**", "*.zip"), recursive=True):  # zips dentro de zips
         _descomprimir(interno, os.path.splitext(interno)[0])
 
 
-def _respaldo_kaggle(clave):
-    for d in glob.glob(os.path.join(KAGGLE_INPUT, "**", f"fitolens-{clave}*"), recursive=True)[:1]:
-        return d
+def _buscar_input(nombre):
+    """Busca en /kaggle/input una carpeta con ese nombre (hasta 5 niveles; '_' y '-' dan igual)."""
+    objetivo = nombre.lower().replace("_", "-")
+    if not os.path.isdir(KAGGLE_INPUT):
+        return None
+    for raiz, dirs, _ in os.walk(KAGGLE_INPUT):
+        if raiz[len(KAGGLE_INPUT):].count(os.sep) >= 5:
+            dirs[:] = []
+            continue
+        for d in dirs:
+            if d.lower().replace("_", "-") == objetivo:
+                return os.path.join(raiz, d)
     return None
 
 
 def obtener(clave, cfg, raiz):
-    """Devuelve la carpeta local con el dataset, descargándolo si hace falta."""
+    """Devuelve la carpeta local con el dataset: primero /kaggle/input, si no, lo descarga."""
     destino = os.path.join(raiz, clave)
     if os.path.isdir(destino) and os.listdir(destino):
         return destino
-    manual = _respaldo_kaggle(clave)
-    if manual:
-        log(f"{clave}: usando la copia subida a Kaggle en {manual}")
-        return manual
+    candidatos = [f"fitolens-{clave}"] + ([cfg["ref"].split("/")[1]] if cfg["tipo"] == "kaggle" else [])
+    for nombre in candidatos:
+        d = _buscar_input(nombre)
+        if d:
+            zips = glob.glob(os.path.join(d, "**", "*.zip"), recursive=True)
+            if zips:   # subido como zip sin descomprimir: se extrae en la carpeta de trabajo
+                for z in zips:
+                    _descomprimir(z, destino, cfg.get("extraer"), borrar=False)
+                return destino
+            log(f"{clave}: usando {d}")
+            return d
     t = cfg["tipo"]
     log(f"{clave}: descargando ({t})")
     if t == "kaggle":
-        slug = cfg["ref"].split("/")[1]
-        for d in glob.glob(os.path.join(KAGGLE_INPUT, "**", slug), recursive=True)[:1]:
-            return d
-        import kagglehub
-        return kagglehub.dataset_download(cfg["ref"])
+        raise RuntimeError(f"agrega el dataset con '+ Add Input': kaggle.com/datasets/{cfg['ref']}")
     if t == "git":
         subprocess.run(["git", "clone", "-q", "--depth", "1", cfg["url"], destino], check=True)
         return destino
     if t == "mendeley":
-        url = f"https://prod-dcd-datasets-cache-zipfiles.s3.eu-west-1.amazonaws.com/{cfg['id']}-{cfg['version']}.zip"
+        i, v = cfg["id"], cfg["version"]
+        urls = [f"https://data.mendeley.com/public-api/zip/{i}/download/{v}",
+                f"https://prod-dcd-datasets-cache-zipfiles.s3.eu-west-1.amazonaws.com/{i}-{v}.zip"]
     else:
-        url = cfg["url"]
+        urls = [cfg["url"]]
     z = destino + ".zip"
-    _bajar(url, z)
+    _bajar(urls, z)
     _descomprimir(z, destino, cfg.get("extraer"))
     return destino
 
@@ -128,7 +148,7 @@ def indexar(clave, cfg, carpeta):
             for nom, *caja in _cajas_yolo(txt, nombres):
                 et = regla(nom, cfg) if cfg["regla"] == "cacao_yolo" else regla(carp, cfg)
                 resumen[(nom if cfg["regla"] == "cacao_yolo" else carp, et)] += 1
-                if et and (caja[2] - caja[0]) * (caja[3] - caja[1]) > 0.002:
+                if et and (caja[2] - caja[0]) * (caja[3] - caja[1]) > 0.004:
                     muestras.append(dict(base, etiqueta=et, caja=caja))
         else:
             et = regla(carp, cfg)
@@ -223,8 +243,8 @@ def preparar(modelo, trabajo, semilla=42, prueba=False):
                 ms = indexar(clave, cfg, carpeta)
             except Exception as e:
                 if cfg["requerido"]:
-                    raise RuntimeError(f"No se pudo obtener '{clave}' ({e}). Súbelo a Kaggle como "
-                                       f"'fitolens-{clave}' y agrégalo al notebook.") from e
+                    raise RuntimeError(f"No se pudo obtener '{clave}' ({e}). Súbelo a Kaggle como dataset "
+                                       f"'fitolens-{clave.replace('_', '-')}' y agrégalo con '+ Add Input'.") from e
                 log(f"AVISO: se omite {clave}: {e}")
                 fallos.append(clave)
                 continue

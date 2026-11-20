@@ -1,7 +1,11 @@
 import '@fontsource-variable/inter'
+import '@fontsource-variable/space-grotesk'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { SesionProvider } from './contexto/Sesion'
+import { aplicarTema } from './datos/tema'
 import './estilos.css'
 
-createRoot(document.getElementById('root')).render(<StrictMode><App /></StrictMode>)
+aplicarTema()
+createRoot(document.getElementById('root')).render(<StrictMode><SesionProvider><App /></SesionProvider></StrictMode>)

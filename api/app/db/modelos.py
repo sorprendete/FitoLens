@@ -22,6 +22,7 @@ class Usuario(Base):
     password_hash: Mapped[str] = mapped_column(String(100))
     rol: Mapped[str] = mapped_column(String(20), default="usuario")  # usuario | admin
     activo: Mapped[bool] = mapped_column(default=True)
+    ultimo_acceso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     creado: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
 
 
@@ -43,3 +44,18 @@ class Diagnostico(Base):
     modelo_version: Mapped[str] = mapped_column(String(120))
     imagen_sha256: Mapped[str] = mapped_column(String(64))
     duracion_ms: Mapped[int] = mapped_column(Integer)
+
+
+class Auditoria(Base):
+    """Registro de eventos de seguridad. La API solo inserta; nadie edita ni borra desde la aplicación."""
+    __tablename__ = "auditoria"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora, index=True)
+    accion: Mapped[str] = mapped_column(String(20), index=True)  # login | registro | diagnostico | admin
+    estado: Mapped[str] = mapped_column(String(20))  # exito | fallo | bloqueado
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id", ondelete="SET NULL"))
+    email: Mapped[str | None] = mapped_column(String(254), index=True)
+    ip: Mapped[str] = mapped_column(String(64), index=True)
+    agente: Mapped[str] = mapped_column(String(300), default="")
+    detalle: Mapped[str | None] = mapped_column(String(500))

@@ -42,7 +42,7 @@ def _enfermedad(s, cultivo):
         return "moho_hoja"
     if "early" in s:
         return "tizon_temprano"
-    if re.search(r"late|phytophthora", s):
+    if re.search(r"late|phyto?p?h?thora", s):
         return "tizon_tardio"
     if re.search(r"bacteri|spot", s):
         return "mancha_bacteriana"
@@ -74,7 +74,7 @@ def papa_indonesia(carpeta, cfg):
     s = _norm(carpeta)
     if "healthy" in s:
         return "papa_sana"
-    if "phytophthora" in s:
+    if re.search(r"phyto?p?h?thora|late", s):   # la carpeta real se llama "Phytopthora"
         return "papa_tizon_tardio"
     return "papa"   # bacteria, fungi, nematode, pest, virus: sin equivalente exacto
 
@@ -110,7 +110,7 @@ def cacao_yolo(nombre_clase, cfg):
         return "cacao_sana"
     if "monilia" in s:
         return "cacao_monilia"
-    if re.search(r"phytophthora|black|negra", s):
+    if re.search(r"phytophthora|fito|black|negra", s):   # el dataset la llama "Fitoftora"
         return "cacao_mazorca_negra"
     return "cacao"
 

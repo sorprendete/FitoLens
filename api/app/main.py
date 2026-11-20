@@ -8,7 +8,7 @@ from app.core.config import ajustes
 from app.core.logs import configurar_logs
 from app.db.sesion import fabrica
 from app.ia.registro import cargar
-from app.rutas import auth, brotes, diagnostico, historial, metricas, salud
+from app.rutas import admin, auth, brotes, diagnostico, historial, metricas, salud
 
 
 @asynccontextmanager
@@ -27,7 +27,7 @@ def crear_app() -> FastAPI:
     if ajustes().cors_lista:
         app.add_middleware(CORSMiddleware, allow_origins=ajustes().cors_lista,
                            allow_methods=["*"], allow_headers=["*"])
-    for modulo in (diagnostico, metricas, brotes, auth, historial, salud):
+    for modulo in (diagnostico, metricas, brotes, auth, historial, admin, salud):
         app.include_router(modulo.router, prefix="/api")
     return app
 

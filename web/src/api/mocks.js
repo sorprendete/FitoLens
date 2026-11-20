@@ -100,3 +100,76 @@ export async function metricas() {
     ],
   }
 }
+
+// ---------- Cuentas y administración (solo con VITE_MODO_DEMO=true) ----------
+let usuarioDemo = { id: 1, email: 'admin@fitolens.pe', nombre: 'Ronald', rol: 'admin' }
+export async function login(email, nombre) {
+  await espera(500)
+  usuarioDemo = { id: 1, email, nombre: nombre || email.split('@')[0], rol: email.startsWith('admin') ? 'admin' : 'usuario' }
+  return { access_token: 'demo', token_type: 'bearer', usuario: usuarioDemo }
+}
+export const yo = async () => usuarioDemo
+
+const PROV_IDS = PROVINCIAS.map((p) => p.id)
+const TODAS = ['cafe_roya', 'cafe_sana', 'cafe_ojo_de_gallo', 'cacao_monilia', 'cacao_sana', 'cacao_mazorca_negra', 'papa_tizon_tardio', 'tomate_tizon_temprano', 'tomate_sana']
+export async function historial() {
+  await espera(300)
+  const items = Array.from({ length: 64 }, (_, i) => {
+    const r = (i * 9301 + 49297) % 233280 / 233280
+    const clase = TODAS[i % TODAS.length]
+    const estado = r < 0.08 ? 'rechazada' : r < 0.2 ? 'no_concluyente' : 'diagnostico'
+    return {
+      id: 1000 - i, creado: new Date(Date.now() - i * 5.3 * 36e5).toISOString(),
+      cultivo: estado === 'rechazada' ? null : clase.split('_')[0], estado,
+      clase: estado === 'rechazada' ? null : clase, confianza: estado === 'no_concluyente' ? 0.45 + r : 0.8 + r * 0.19,
+      provincia: PROV_IDS[i % PROV_IDS.length],
+    }
+  })
+  return { items }
+}
+
+export const resumen = async () => ({ usuarios: 48, analisis: 1264, sanos: 402, enfermos: 701, no_concluyentes: 112, rechazadas: 49, logins_fallidos_24h: 17, bloqueos_24h: 2 })
+
+const NOMBRES = ['Ronald', 'María Flores', 'José Tapullima', 'Lucía Pinedo', 'Carlos Sangama', 'Rosa Amasifuén', 'Pedro Salas', 'Ana Del Águila']
+export async function usuarios() {
+  await espera(250)
+  return NOMBRES.map((nombre, i) => ({
+    id: i + 1, nombre, email: i ? `${nombre.split(' ')[0].toLowerCase()}@correo.pe` : 'admin@fitolens.pe',
+    rol: i ? 'usuario' : 'admin', activo: i !== 6, creado: new Date(Date.now() - (i + 1) * 3 * 864e5).toISOString(),
+    ultimo_acceso: new Date(Date.now() - i * 7 * 36e5).toISOString(), diagnosticos: 80 - i * 9,
+  }))
+}
+
+const ACC = [['login', 'exito'], ['diagnostico', 'exito'], ['login', 'fallo'], ['diagnostico', 'exito'], ['registro', 'exito'], ['login', 'bloqueado'], ['admin', 'exito'], ['diagnostico', 'fallo']]
+export async function auditoria({ accion, estado } = {}) {
+  await espera(250)
+  return Array.from({ length: 80 }, (_, i) => {
+    const [a, e] = ACC[i % ACC.length]
+    return {
+      id: 5000 - i, fecha: new Date(Date.now() - i * 41 * 6e4).toISOString(), accion: a, estado: e,
+      email: e === 'bloqueado' || (a === 'login' && e === 'fallo') ? 'admin@fitolens.pe' : `${NOMBRES[i % 8].split(' ')[0].toLowerCase()}@correo.pe`,
+      ip: e === 'bloqueado' || e === 'fallo' ? '45.161.12.' + (i % 3 + 7) : `181.65.${i % 40}.${(i * 7) % 250}`,
+      agente: i % 5 === 2 ? 'python-requests/2.32' : 'Mozilla/5.0 (Android 14) Chrome/131',
+      detalle: { login: 'Inicio de sesión', diagnostico: 'Foto analizada', registro: 'Cuenta creada', admin: 'Cuenta desactivada' }[a],
+    }
+  }).filter((x) => (!accion || x.accion === accion) && (!estado || x.estado === estado))
+}
+
+export async function amenazas(dias) {
+  await espera(700)
+  const ip = (ipx, nivel, puntaje, reglas, explicacion, c) => ({ ip: ipx, nivel, puntaje, anomalia_ml: puntaje >= 55, solo_ml: puntaje >= 55 && !reglas.length, reglas, explicacion, caracteristicas: c })
+  const ips = [
+    ip('45.161.12.8', 'alto', 78.4, [{ tipo: 'Fuerza bruta', detalle: '23 contraseñas fallidas', grave: true }, { tipo: 'Prueba de cuentas', detalle: '7 correos distintos', grave: true }],
+      ['23 contraseñas fallidas (lo normal es 0)', 'Cliente automatizado: python-requests'], { eventos: 41, fallos_login: 23, correos_distintos: 7, automatizado: 1 }),
+    ip('190.42.7.33', 'medio', 61.2, [], ['El 80 % de su actividad fue de madrugada (0 a 5 h)', '32 eventos en un mismo minuto (lo normal es 2)'], { eventos: 58, max_por_minuto: 32, frac_nocturna: 0.8 }),
+    ip('179.7.88.120', 'medio', 49.5, [{ tipo: 'Muchas imágenes rechazadas', detalle: '14 fotos que no eran plantas', grave: false }], [], { eventos: 22, rechazos: 14 }),
+    ...Array.from({ length: 9 }, (_, i) => ip(`181.65.${i * 3}.${20 + i}`, 'normal', 38 + i * 1.3, [], [], { eventos: 6 + i })),
+  ]
+  return {
+    fuente: 'simulado', dias,
+    resumen: { eventos: 1840, ips: ips.length, alto: 1, medio: 2, solo_ml: 1, por_tipo: { 'Fuerza bruta': 1, 'Prueba de cuentas': 1, 'Muchas imágenes rechazadas': 1, 'Comportamiento anómalo (solo ML)': 1 } },
+    modelo: { algoritmo: 'Isolation Forest (scikit-learn, no supervisado)', entrenado: true, motivo: null, arboles: 300, umbral_puntaje: 55,
+      caracteristicas: ['eventos', 'contraseñas fallidas', 'cuentas distintas usadas', 'imágenes rechazadas', 'eventos en un mismo minuto', 'actividad de madrugada', 'cliente automatizado'] },
+    ips,
+  }
+}

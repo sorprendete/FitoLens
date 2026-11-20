@@ -26,7 +26,7 @@ def notebook(modelos):
               "2. Menú **Save Version** → **Save & Run All (Commit)**. Puedes cerrar la pestaña: corre solo.\n"
               "3. Al terminar, en la pestaña **Output** descarga `salida/modelo_<nombre>.zip`.\n\n"
               "El código se genera desde `entrenamiento/fitolens_ent/` del repositorio FitoLens: no lo edites aquí."),
-        celda("code", "!pip install -q timm onnx onnxruntime imagehash kagglehub\n"
+        celda("code", "!pip install -q timm onnx onnxruntime imagehash\n"
               "!nvidia-smi --query-gpu=name,memory.total --format=csv"),
         celda("code", "import json, os\n"
               "os.makedirs('fitolens_ent', exist_ok=True)\n"
@@ -36,7 +36,9 @@ def notebook(modelos):
               "print(sorted(ARCHIVOS))"),
     ]
     for m in modelos:
-        celdas.append(celda("code", f"!python -m fitolens_ent.entrenar --modelo {m}"))
+        celdas.append(celda("code", f"!python -m fitolens_ent.entrenar --modelo {m}\n"
+                            f"assert os.path.exists('/kaggle/working/salida/{m}/manifest.json'), "
+                            f"'Falló el entrenamiento de {m}: revisa el error arriba (pestaña Logs)'"))
     celdas.append(celda("code",
         "import json, glob\n"
         "for f in sorted(glob.glob('/kaggle/working/salida/*/metricas.json')):\n"

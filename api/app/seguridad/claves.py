@@ -1,8 +1,5 @@
-"""Contraseñas (bcrypt), tokens JWT y límite de peticiones por IP."""
-import time
-from collections import defaultdict, deque
+"""Contraseñas (bcrypt) y tokens JWT."""
 from datetime import datetime, timedelta, timezone
-from threading import Lock
 
 import bcrypt
 import jwt
@@ -34,25 +31,3 @@ def leer_token(token: str) -> dict | None:
         return jwt.decode(token, ajustes().jwt_secreto, algorithms=[ALGORITMO])
     except jwt.PyJWTError:
         return None
-
-
-class LimitadorPorIP:
-    """Ventana deslizante de 60 s en memoria. Suficiente para un solo contenedor de API."""
-
-    def __init__(self) -> None:
-        self._eventos: dict[str, deque] = defaultdict(deque)
-        self._lock = Lock()
-
-    def permitir(self, ip: str, limite: int) -> bool:
-        ahora = time.monotonic()
-        with self._lock:
-            cola = self._eventos[ip]
-            while cola and ahora - cola[0] > 60:
-                cola.popleft()
-            if len(cola) >= limite:
-                return False
-            cola.append(ahora)
-            return True
-
-
-limitador = LimitadorPorIP()

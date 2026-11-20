@@ -13,14 +13,14 @@ export default function Modelos() {
       <header className="encabezado">
         <div>
           <p className="sobretitulo">Transparencia</p>
-          <h1>Qué tan bien funciona</h1>
+          <h2 className="titular">Qué tan bien funciona</h2>
           <p className="tenue">Medido con fotos <b>de campo</b> que el modelo nunca vio al entrenar, no con fotos de laboratorio.
             Así se mide de verdad cómo le irá al agricultor.</p>
         </div>
       </header>
-      {error && <p className="aviso mal">{error}</p>}
+      {error && <p className="alerta mal">{error}</p>}
       {datos && esDemo() && (
-        <p className="aviso aviso"><b>Cifras de ejemplo.</b>&nbsp;No son mediciones: los valores reales aparecen aquí cuando la API carga los modelos entrenados.</p>
+        <p className="alerta aviso"><b>Cifras de ejemplo.</b>&nbsp;No son mediciones: los valores reales aparecen aquí cuando la API carga los modelos entrenados.</p>
       )}
       <div className="modelos-grid">
         {datos?.modelos?.map((m) => <Ficha key={m.id} m={m} />)}

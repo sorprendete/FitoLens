@@ -31,6 +31,9 @@ class Ajustes(BaseSettings):
 
     # Protección
     limite_diagnosticos_minuto: int = 20  # por IP
+    login_max_fallos: int = 5  # fallos de un mismo correo antes de bloquearlo
+    login_max_fallos_ip: int = 20  # más alto: en la feria muchos comparten el mismo wifi (misma IP)
+    login_bloqueo_minutos: int = 15
     cors_origenes: str = ""  # lista separada por comas; vacío = mismo dominio
 
     log_nivel: str = "INFO"

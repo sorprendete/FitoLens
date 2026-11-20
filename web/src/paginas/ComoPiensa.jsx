@@ -21,7 +21,7 @@ export default function ComoPiensa() {
       <header className="encabezado">
         <div>
           <p className="sobretitulo">Explicable, no una caja negra</p>
-          <h1>Cómo piensa la IA</h1>
+          <h2 className="titular">Cómo piensa la IA</h2>
           <p className="tenue">FitoLens no es un solo modelo: es una cadena de decisiones, y cada una se puede revisar.</p>
         </div>
       </header>

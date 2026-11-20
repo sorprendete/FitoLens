@@ -50,7 +50,7 @@ export default function Brotes() {
       <header className="encabezado">
         <div>
           <p className="sobretitulo">Vigilancia fitosanitaria · Región San Martín</p>
-          <h1>Mapa de brotes</h1>
+          <h2 className="titular">Mapa de brotes</h2>
           <p className="tenue">Casos con enfermedad detectados por FitoLens en cada provincia. Se actualiza solo cada {REFRESCO_BROTES / 1000} s.</p>
         </div>
         <div className="filtros">
@@ -63,7 +63,7 @@ export default function Brotes() {
           </select>
         </div>
       </header>
-      {error && <p className="aviso mal">{error}</p>}
+      {error && <p className="alerta mal">{error}</p>}
 
       <div className="brotes-grid">
         <div className="tarjeta mapa">

@@ -1,0 +1,251 @@
+{
+ "escala": {
+  "probabilidad": [
+   "Muy baja",
+   "Baja",
+   "Media",
+   "Alta",
+   "Muy alta"
+  ],
+  "impacto": [
+   "Mínimo",
+   "Menor",
+   "Moderado",
+   "Mayor",
+   "Crítico"
+  ],
+  "niveles": {
+   "alto": 15,
+   "medio": 8
+  }
+ },
+ "riesgos": [
+  {
+   "id": "R1",
+   "activo": "Cuentas de usuario",
+   "amenaza": "Fuerza bruta o prueba de contraseñas",
+   "vulnerabilidad": "Contraseñas débiles o reutilizadas",
+   "pilar": "Confidencialidad",
+   "probabilidad": 4,
+   "impacto": 4,
+   "controles": [
+    "Contraseñas con bcrypt",
+    "Bloqueo de 15 min tras 5 intentos fallidos",
+    "Auditoría de cada inicio de sesión",
+    "Detector de amenazas con Isolation Forest"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 4
+   },
+   "pendiente": "Segundo factor (TOTP) para administradores"
+  },
+  {
+   "id": "R2",
+   "activo": "Modelos de IA (model.onnx)",
+   "amenaza": "Reemplazo o alteración de un modelo",
+   "vulnerabilidad": "Archivo del modelo modificable en el servidor",
+   "pilar": "Integridad",
+   "probabilidad": 3,
+   "impacto": 5,
+   "controles": [
+    "SHA-256 del manifest verificado al cargar",
+    "Carpeta de modelos montada en solo lectura"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 5
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R3",
+   "activo": "Clave para firmar los JWT",
+   "amenaza": "Robo de la clave y falsificación de sesiones",
+   "vulnerabilidad": "Clave en el archivo .env del VPS",
+   "pilar": "Confidencialidad",
+   "probabilidad": 2,
+   "impacto": 5,
+   "controles": [
+    "Clave solo en .env, fuera de git",
+    "Tokens con expiración",
+    "Rol verificado en el servidor en cada ruta de admin"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 5
+   },
+   "pendiente": "Rotar la clave cada semestre"
+  },
+  {
+   "id": "R4",
+   "activo": "API de diagnóstico",
+   "amenaza": "Saturación con miles de fotos (abuso o DoS)",
+   "vulnerabilidad": "Inferencia costosa en CPU",
+   "pilar": "Disponibilidad",
+   "probabilidad": 4,
+   "impacto": 3,
+   "controles": [
+    "Límite de diagnósticos por minuto e IP",
+    "Tamaño máximo de imagen",
+    "fail2ban y firewall (solo 22, 80 y 443)"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 3
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R5",
+   "activo": "Subida de imágenes",
+   "amenaza": "Archivo malicioso disfrazado de foto",
+   "vulnerabilidad": "El servidor procesa archivos de terceros",
+   "pilar": "Integridad",
+   "probabilidad": 3,
+   "impacto": 4,
+   "controles": [
+    "Se valida el tipo real de la imagen y se re-decodifica",
+    "Límite de tamaño",
+    "Se guarda solo la huella SHA-256, no la foto"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 4
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R6",
+   "activo": "Base de datos PostgreSQL",
+   "amenaza": "Pérdida de datos por falla o error humano",
+   "vulnerabilidad": "Un solo servidor",
+   "pilar": "Disponibilidad",
+   "probabilidad": 3,
+   "impacto": 4,
+   "controles": [
+    "Copia diaria con pg_dump y rotación de 14 días",
+    "La base no se expone a internet"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 3
+   },
+   "pendiente": "Copiar los respaldos fuera del VPS"
+  },
+  {
+   "id": "R7",
+   "activo": "Tráfico web",
+   "amenaza": "Espionaje o alteración de datos en tránsito",
+   "vulnerabilidad": "Redes Wi-Fi públicas de la feria y del campo",
+   "pilar": "Confidencialidad",
+   "probabilidad": 3,
+   "impacto": 4,
+   "controles": [
+    "HTTPS automático con Let's Encrypt (Caddy)",
+    "HSTS activado"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 4
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R8",
+   "activo": "Panel de administración",
+   "amenaza": "Escalada de privilegios de un usuario común",
+   "vulnerabilidad": "Rutas de admin accesibles por URL",
+   "pilar": "Confidencialidad",
+   "probabilidad": 3,
+   "impacto": 5,
+   "controles": [
+    "Rol admin comprobado en la API, no solo en la web",
+    "Las acciones de admin quedan en la auditoría",
+    "Un admin no puede desactivarse a sí mismo"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 5
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R9",
+   "activo": "Servidor VPS",
+   "amenaza": "Explotación de una vulnerabilidad del sistema",
+   "vulnerabilidad": "Paquetes sin actualizar",
+   "pilar": "Integridad",
+   "probabilidad": 3,
+   "impacto": 5,
+   "controles": [
+    "Actualizaciones de seguridad automáticas",
+    "Contenedores separados por servicio",
+    "Firewall ufw"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 4
+   },
+   "pendiente": "Entrar por SSH solo con llave, sin contraseña"
+  },
+  {
+   "id": "R10",
+   "activo": "Diagnóstico de la IA",
+   "amenaza": "Decisión equivocada del agricultor por un diagnóstico erróneo",
+   "vulnerabilidad": "Fotos de campo distintas a las de entrenamiento",
+   "pilar": "Integridad",
+   "probabilidad": 4,
+   "impacto": 4,
+   "controles": [
+    "Router que rechaza fotos fuera de los cultivos",
+    "Confianza calibrada y respuesta \"no concluyente\"",
+    "Métricas publicadas medidas en campo",
+    "Aviso de consultar a un agrónomo"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 3
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R11",
+   "activo": "Mapa de brotes",
+   "amenaza": "Datos falsos que inflan un brote",
+   "vulnerabilidad": "Diagnósticos anónimos con provincia declarada",
+   "pilar": "Integridad",
+   "probabilidad": 3,
+   "impacto": 3,
+   "controles": [
+    "Límite por IP",
+    "Solo cuentan los diagnósticos concluyentes",
+    "Auditoría por IP"
+   ],
+   "residual": {
+    "probabilidad": 2,
+    "impacto": 3
+   },
+   "pendiente": null
+  },
+  {
+   "id": "R12",
+   "activo": "Datos personales",
+   "amenaza": "Exposición de correos o ubicación de usuarios",
+   "vulnerabilidad": "Base con correos y provincias",
+   "pilar": "Confidencialidad",
+   "probabilidad": 2,
+   "impacto": 4,
+   "controles": [
+    "La web envía solo la provincia, no el GPS exacto",
+    "El historial es visible solo para su dueño",
+    "Contraseñas nunca en texto plano"
+   ],
+   "residual": {
+    "probabilidad": 1,
+    "impacto": 3
+   },
+   "pendiente": null
+  }
+ ]
+}

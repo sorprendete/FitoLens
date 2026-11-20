@@ -1,4 +1,4 @@
-import { AlertTriangle, Camera, CircleCheck, CircleHelp, ImageUp, LocateFixed, RotateCcw, ShieldAlert } from 'lucide-react'
+import { AlertTriangle, Bug, Camera, CircleCheck, CircleHelp, Focus, Hand, ImageUp, LocateFixed, MapPin, RotateCcw, ShieldAlert, Sun } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { diagnosticar } from '../api/cliente'
 import Barra from '../componentes/Barra'
@@ -52,33 +52,44 @@ export default function Diagnostico() {
 
       {!foto ? (
         <div className="portada">
-          <p className="sobretitulo">Café · Cacao · Papa · Tomate · Pimiento</p>
-          <h1>Una foto de la hoja.<br /><span>Un diagnóstico en un segundo.</span></h1>
-          <p className="tenue">FitoLens reconoce el cultivo, detecta la enfermedad y te muestra en qué parte de la hoja la vio.
-            Si no está segura, te lo dice.</p>
-          <div className="acciones">
-            <button className="boton grande" onClick={() => setCamara(true)}><Camera />Tomar foto</button>
-            <button className="boton grande sec" onClick={() => entrada.current.click()}><ImageUp />Subir foto</button>
+          <div className="portada-txt">
+            <p className="sobretitulo">Café · Cacao · Papa · Tomate · Pimiento</p>
+            <h2 className="titular">Una foto.<br /><span className="degradado">Un diagnóstico en un segundo.</span></h2>
+            <p className="tenue grande-txt">FitoLens reconoce el cultivo, detecta la enfermedad y te muestra en qué parte de la hoja la vio.
+              Si no está segura, te lo dice.</p>
+            <div className="acciones">
+              <button className="btn grande brillo" onClick={() => setCamara(true)}><Camera />Tomar foto</button>
+              <button className="btn grande sec" onClick={() => entrada.current.click()}><ImageUp />Subir foto</button>
+            </div>
+            <div className="ubicacion">
+              <label htmlFor="prov"><MapPin size={17} />¿Dónde está tu cultivo?</label>
+              <select id="prov" value={provincia} onChange={(e) => setProvincia(e.target.value)}>
+                <option value="">Prefiero no decirlo</option>
+                {PROVINCIAS.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+              </select>
+              <button className="icono-btn" onClick={ubicar} title="Usar mi ubicación" aria-label="Usar mi ubicación"><LocateFixed size={18} /></button>
+              {gps && <small className="tenue">{gps}</small>}
+            </div>
+            <p className="tenue pequeno">La provincia alimenta el mapa de brotes de la región. No se envía tu ubicación exacta.</p>
           </div>
-          <div className="ubicacion">
-            <label htmlFor="prov">¿Dónde está tu cultivo?</label>
-            <select id="prov" value={provincia} onChange={(e) => setProvincia(e.target.value)}>
-              <option value="">Prefiero no decirlo</option>
-              {PROVINCIAS.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-            <button className="boton-icono" onClick={ubicar} title="Usar mi ubicación" aria-label="Usar mi ubicación"><LocateFixed size={18} /></button>
-            {gps && <small className="tenue">{gps}</small>}
-          </div>
-          <p className="tenue pequeno">La provincia alimenta el mapa de brotes de la región. No guardamos tu ubicación exacta.</p>
+          <aside className="tarjeta guia">
+            <h3>Para un buen diagnóstico</h3>
+            <ul>
+              <li><Sun size={20} /><div><b>Buena luz, sin sol directo</b><small>La sombra de un árbol o un día nublado es ideal.</small></div></li>
+              <li><Focus size={20} /><div><b>Una sola hoja o mazorca</b><small>Que ocupe casi todo el recuadro, enfocada.</small></div></li>
+              <li><Bug size={20} /><div><b>Que se vea el síntoma</b><small>Manchas, polvo, pudrición: acerca la cámara a la lesión.</small></div></li>
+              <li><Hand size={20} /><div><b>Fondo simple</b><small>Si puedes, pon tu mano o un cuaderno detrás.</small></div></li>
+            </ul>
+          </aside>
         </div>
       ) : (
         <div className="diag-grid">
           <div>
             <MapaCalor foto={foto} calor={res?.mapa_calor_png_base64} cargando={cargando} />
             <div className="acciones">
-              <button className="boton" onClick={() => setCamara(true)}><Camera />Otra foto</button>
-              <button className="boton sec" onClick={() => entrada.current.click()}><ImageUp />Subir</button>
-              <button className="boton sec" onClick={reiniciar}><RotateCcw />Inicio</button>
+              <button className="btn" onClick={() => setCamara(true)}><Camera />Otra foto</button>
+              <button className="btn sec" onClick={() => entrada.current.click()}><ImageUp />Subir</button>
+              <button className="btn sec" onClick={reiniciar}><RotateCcw />Inicio</button>
             </div>
           </div>
           <div className="tarjeta resultado" aria-live="polite">
@@ -104,7 +115,7 @@ function Cargando() {
 
 function Aviso({ icono: Icono, tono, titulo, texto }) {
   return (
-    <div className={`aviso ${tono}`}>
+    <div className={`alerta ${tono}`}>
       <Icono size={28} />
       <div><h2>{titulo}</h2><p>{texto}</p></div>
     </div>

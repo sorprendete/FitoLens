@@ -5,14 +5,15 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Uplo
 from sqlalchemy.orm import Session
 
 from app.core.config import ajustes
-from app.core.seguridad import limitador
+from app.seguridad import auditoria
+from app.seguridad.limites import limitador
 from app.db.modelos import Diagnostico, Usuario
 from app.db.sesion import db
 from app.esquemas import PROVINCIAS, DiagnosticoSalida
 from app.ia import imagen as lector
 from app.ia.pipeline import diagnosticar
 from app.ia.registro import Registro
-from app.rutas.dependencias import ip_cliente, registro_modelos, usuario_opcional
+from app.rutas.dependencias import registro_modelos, usuario_opcional
 
 router = APIRouter(tags=["diagnóstico"])
 log = logging.getLogger("fitolens.diagnostico")
@@ -31,7 +32,8 @@ async def crear(
     sesion: Session = Depends(db),
 ):
     a = ajustes()
-    if not limitador.permitir(ip_cliente(request), a.limite_diagnosticos_minuto):
+    if not limitador.permitir(auditoria.ip_cliente(request), a.limite_diagnosticos_minuto):
+        auditoria.registrar(sesion, request, "diagnostico", "bloqueado", detalle="Límite por minuto superado.")
         raise HTTPException(429, "Demasiadas fotos seguidas. Espera un minuto.")
     if provincia is not None and provincia not in PROVINCIAS:
         raise HTTPException(400, "Provincia desconocida.")
@@ -50,7 +52,10 @@ async def crear(
         modelo_version=r.modelo_version, imagen_sha256=sha, duracion_ms=duracion,
     )
     sesion.add(fila)
-    sesion.commit()
+    sesion.flush()
+    detalle = f"{r.estado}: {r.clase or r.motivo or ''} ({r.confianza or 0:.2f})"
+    auditoria.registrar(sesion, request, "diagnostico", "fallo" if r.estado == "rechazada" else "exito",
+                        usuario_id=fila.usuario_id, email=usuario.email if usuario else None, detalle=detalle)
     if a.guardar_imagenes:
         _guardar(datos, sha, r.cultivo or r.estado)
     log.info("diagnostico id=%s estado=%s clase=%s conf=%s ms=%s",

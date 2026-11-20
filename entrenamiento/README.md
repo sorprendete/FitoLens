@@ -19,8 +19,11 @@ Cada uno sale como `model.onnx` + `manifest.json` + `metricas.json` (contrato en
 2. **Create → New Notebook → File → Import Notebook** y sube `notebooks/fitolens_todos.ipynb`
    (o uno por modelo: `fitolens_router.ipynb`, `fitolens_hortalizas.ipynb`, etc.).
 3. Panel derecho → *Settings*: **Accelerator = GPU T4 x2** (o P100) e **Internet = On**.
-4. Por si la descarga automática falla, en *Add Input* agrega estos datasets de Kaggle:
-   `abdallahalidev/plantvillage-dataset`, `serranosebas/enfermedades-cacao-yolov4`, `prasunroy/natural-images`.
+4. **Obligatorio**: con **+ Add Input** agrega estos datasets (en una corrida "Save Version" Kaggle no deja
+   adjuntarlos desde el código):
+   `abdallahalidev/plantvillage-dataset`, `serranosebas/enfermedades-cacao-yolov4`, `prasunroy/natural-images`,
+   y tus copias de Mendeley `fitolens-cafe-saposoa` y `fitolens-papa-indonesia` (Mendeley bloquea la descarga
+   automática: baja el zip con "Download All" y súbelo tal cual como dataset de Kaggle con ese nombre).
 5. **Save Version → Save & Run All (Commit)**. Corre solo, aunque cierres la pestaña.
    Tiempo estimado: `todos` unas 5 a 7 h; café o cacao solos menos de 1 h (sin contar la descarga).
 6. Al terminar, en **Output** descarga los `salida/modelo_<nombre>.zip` y únelos:

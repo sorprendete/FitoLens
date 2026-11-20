@@ -1,14 +1,17 @@
 """Dependencias compartidas: usuario actual (JWT), admin y modelos cargados."""
+import logging
+
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.seguridad import leer_token
+from app.seguridad.claves import leer_token
 from app.db.modelos import Usuario
 from app.db.sesion import db
 from app.ia.registro import Registro
 
 _bearer = HTTPBearer(auto_error=False)
+log = logging.getLogger("fitolens.acceso")
 
 
 def usuario_opcional(cred: HTTPAuthorizationCredentials | None = Depends(_bearer),
@@ -28,11 +31,13 @@ def usuario_requerido(usuario: Usuario | None = Depends(usuario_opcional)) -> Us
     return usuario
 
 
+def admin_requerido(request: Request, usuario: Usuario = Depends(usuario_requerido)) -> Usuario:
+    # El rol se lee de la base de datos en cada petición, no del token: quitarlo surte efecto al instante.
+    if usuario.rol != "admin":
+        log.warning("Acceso denegado a %s: usuario=%s", request.url.path, usuario.id)
+        raise HTTPException(403, "Solo el administrador puede ver esta sección.")
+    return usuario
+
+
 def registro_modelos(request: Request) -> Registro:
     return request.app.state.registro
-
-
-def ip_cliente(request: Request) -> str:
-    # Caddy agrega X-Forwarded-For; la API solo es accesible a través de Caddy.
-    reenviada = request.headers.get("x-forwarded-for", "")
-    return reenviada.split(",")[0].strip() or (request.client.host if request.client else "?")

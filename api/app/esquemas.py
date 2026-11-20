@@ -87,3 +87,43 @@ class Brotes(BaseModel):
     desde: str
     total: int
     provincias: list[ProvinciaBrotes]
+
+
+# --- Administración ---
+
+class Resumen(BaseModel):
+    usuarios: int
+    analisis: int
+    sanos: int
+    enfermos: int
+    no_concluyentes: int
+    rechazadas: int
+    logins_fallidos_24h: int
+    bloqueos_24h: int
+
+
+class UsuarioAdmin(BaseModel):
+    id: int
+    nombre: str
+    email: str
+    rol: str
+    activo: bool
+    creado: datetime
+    ultimo_acceso: datetime | None
+    diagnosticos: int
+
+
+class CambioEstado(BaseModel):
+    activo: bool
+
+
+class EventoAuditoria(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    fecha: datetime
+    accion: str
+    estado: str
+    email: str | None
+    ip: str
+    agente: str
+    detalle: str | None
