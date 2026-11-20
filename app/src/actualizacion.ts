@@ -1,13 +1,12 @@
 // Aviso de versión nueva (como en Play Store), sin tienda: el servidor publica el APK en
 // /descargas/FitoLens.apk y su versión en /descargas/app.json (despliegue/scripts/publicar_apk.sh).
 // Si la versión del servidor es mayor que la de esta app (app.json → expo.version), se ofrece actualizar.
-import { Linking, Platform } from 'react-native'
+import { Linking, PermissionsAndroid, Platform } from 'react-native'
 import Constants from 'expo-constants'
-import { DownloadTask, File, Paths } from 'expo-file-system'
-import * as IntentLauncher from 'expo-intent-launcher'
 import { API, enLinea } from './servidor'
+import { disponible as moduloDisponible, iniciar as iniciarDescarga } from '../modules/descarga-apk'
 
-export type Novedad = { version: string; tamano_mb?: number; notas?: string }
+export type Novedad = { version: string; tamano_mb?: number; notas?: string; sha256?: string }
 export const VERSION_APP = Constants.expoConfig?.version ?? '0'
 const APK = `${API}/descargas/FitoLens.apk`
 
@@ -29,20 +28,23 @@ export async function buscarActualizacion(): Promise<Novedad | null> {
   } catch { return null } finally { clearTimeout(t) }
 }
 
-// Descarga el APK (con avance de 0 a 1) y abre el instalador de Android, que pide confirmar.
-// Los datos de la app (historial, cuenta) se conservan: es la misma app firmada con la misma llave.
-export async function instalarActualizacion(alAvanzar: (p: number) => void) {
-  const destino = new File(Paths.cache, 'FitoLens-nueva.apk')
-  if (destino.exists) destino.delete()
-  try {
-    const tarea = new DownloadTask(APK, destino, { onProgress: ({ bytesWritten, totalBytes }) => totalBytes > 0 && alAvanzar(bytesWritten / totalBytes) })
-    const f = await tarea.downloadAsync()
-    if (!f) throw new Error('Descarga interrumpida')
-    await IntentLauncher.startActivityAsync('android.intent.action.VIEW', {
-      data: f.contentUri, type: 'application/vnd.android.package-archive', flags: 1, // FLAG_GRANT_READ_URI_PERMISSION
-    })
-  } catch {
-    // Plan B: que el navegador descargue el APK; al tocar la notificación se instala igual.
-    await Linking.openURL(APK)
+/**
+ * Pide permiso de notificaciones (Android 13+) y arranca la descarga en segundo plano
+ * con el módulo nativo. Si el módulo no está disponible, abre la URL en el navegador.
+ */
+export async function instalarActualizacion(novedad: Novedad) {
+  // Plan A: módulo nativo de descarga en segundo plano
+  if (moduloDisponible) {
+    // Pedir permiso de notificaciones en Android 13+ (API 33+)
+    if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
+      try {
+        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)
+      } catch { /* si no lo concede, la descarga funciona igual pero sin notificación */ }
+    }
+    iniciarDescarga(APK, novedad.version, novedad.sha256)
+    return
   }
+
+  // Plan B: que el navegador descargue el APK; al tocar la notificación se instala igual.
+  await Linking.openURL(APK)
 }
