@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
-import { FlatList, Image, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import * as ImagePicker from 'expo-image-picker'
 import { C, brillo } from './src/tema'
@@ -21,23 +22,27 @@ export default function App() {
   const [vista, setVista] = useState<Vista>('diagnosticar')
   // Cuenta opcional: si hay sesión, la cola se sube sola cuando vuelve internet.
   useEffect(() => { cargarCuenta(); return sincronizarSola() }, [])
+  // Android dibuja de borde a borde: este SafeAreaView respeta la barra de estado (arriba) y la de
+  // navegación ◀ ● ■ (abajo), para que la cabecera y las pestañas nunca queden tapadas.
   return (
-    <SafeAreaView style={s.raiz}>
+    <SafeAreaProvider>
+    <SafeAreaView style={s.raiz} edges={['top', 'bottom', 'left', 'right']}>
       <StatusBar style="light" />
       <View style={s.cabecera}>
-        <Text style={s.marca}>Fito<Text style={{ color: C.acento }}>Lens</Text></Text>
-        <Text style={s.chip}>{hayIaLocal() ? '● IA en el teléfono' : '● IA en el servidor'}</Text>
+        <Text style={s.marca} numberOfLines={1}>Fito<Text style={{ color: C.acento }}>Lens</Text></Text>
+        <Text style={s.chip} numberOfLines={1}>{hayIaLocal() ? '● IA en el teléfono' : '● IA en el servidor'}</Text>
       </View>
       <AvisoActualizacion />
       {vista === 'diagnosticar' ? <Diagnosticar /> : vista === 'historial' ? <Historial /> : vista === 'parcelas' ? <Parcelas /> : <Cuenta />}
       <View style={s.pestanas}>
         {(Object.keys(PESTANAS) as Vista[]).map((v) => (
           <Pressable key={v} onPress={() => setVista(v)} style={[s.pestana, vista === v && { borderTopColor: C.acento }]}>
-            <Text style={[s.pestanaTxt, vista === v && { color: C.acento }]}>{PESTANAS[v]}</Text>
+            <Text style={[s.pestanaTxt, vista === v && { color: C.acento }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75}>{PESTANAS[v]}</Text>
           </Pressable>
         ))}
       </View>
     </SafeAreaView>
+    </SafeAreaProvider>
   )
 }
 
@@ -151,10 +156,10 @@ function Boton({ texto, onPress, principal, desactivado }: { texto: string; onPr
 }
 
 const s = StyleSheet.create({
-  raiz: { flex: 1, backgroundColor: C.fondo, paddingTop: 30 },
-  cabecera: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10 },
-  marca: { color: C.texto, fontSize: 24, fontWeight: '800', letterSpacing: 0.5 },
-  chip: { color: C.acento2, fontSize: 12, borderWidth: 1, borderColor: C.acento2 + '55', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
+  raiz: { flex: 1, backgroundColor: C.fondo },
+  cabecera: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  marca: { color: C.texto, fontSize: 24, fontWeight: '800', letterSpacing: 0.5, flexShrink: 0 },
+  chip: { color: C.acento2, fontSize: 12, borderWidth: 1, borderColor: C.acento2 + '55', borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4, flexShrink: 1 },
   contenido: { padding: 16, gap: 14, paddingBottom: 30 },
   tarjeta: { backgroundColor: C.sup, borderWidth: 1, borderRadius: 18, padding: 18, gap: 6 },
   sobre: { color: C.acento, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
@@ -171,8 +176,8 @@ const s = StyleSheet.create({
   centro: { alignItems: 'center', gap: 8, padding: 10 },
   barra: { height: 8, backgroundColor: C.fondo2, borderRadius: 4, overflow: 'hidden', marginTop: 8 },
   pestanas: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: C.borde, backgroundColor: C.fondo2 },
-  pestana: { flex: 1, alignItems: 'center', paddingVertical: 14, borderTopWidth: 2, borderTopColor: 'transparent' },
-  pestanaTxt: { color: C.tenue, fontWeight: '700' },
+  pestana: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 50, paddingVertical: 12, paddingHorizontal: 2, borderTopWidth: 2, borderTopColor: 'transparent' },
+  pestanaTxt: { color: C.tenue, fontWeight: '700', fontSize: 13 },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.sup, borderRadius: 14, padding: 10, borderLeftWidth: 3 },
   mini: { width: 52, height: 52, borderRadius: 10 },
 })
