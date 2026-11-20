@@ -1,6 +1,6 @@
-import { Crop, Flame, Gauge, ScanSearch, Sprout } from 'lucide-react'
+import { Crop, Flame, Gauge, Leaf, ScanSearch, Sprout } from 'lucide-react'
 
-const ICONO = { router: Sprout, especialista: ScanSearch, calibracion: Gauge, mapa_calor: Flame }
+const ICONO = { router: Sprout, especialista: ScanSearch, calibracion: Gauge, segmentacion: Leaf, mapa_calor: Flame }
 
 // Línea de tiempo de lo que hizo la IA con esta foto (campo "pasos" de la API).
 export default function Pasos({ pasos = [] }) {

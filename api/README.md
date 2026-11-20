@@ -20,6 +20,8 @@ tests/         pytest con SQLite y modelos falsos
 
 Flujo de `POST /api/diagnostico`: foto validada → **router** (¿qué cultivo?; rechaza otra planta o no planta) → **especialista** del cultivo → **calibración** (softmax con temperatura y umbral; por debajo, "no concluyente") → **mapa de calor** (CAM de la clase ganadora) → se guarda en `diagnosticos`.
 
+**Ubicación de la hoja** (`app/ia/segmentacion.py`): U2-Net-p (4.6 MB, Apache 2.0, ONNX de rembg fijado a 192 px, en `app/ia/recursos/`) corre en un hilo paralelo al router y al especialista (~80 ms en CPU; añade ~1 ms al total). Devuelve `mascara_ok` y `contorno_hoja` (polígonos `[x, y]` en 0-1) y recorta el mapa de calor a la hoja. El clasificador sigue viendo la foto completa: la segmentación no cambia ningún diagnóstico. Respaldo seguro (`mascara_ok=false`, foto completa como antes) si el modelo falta o falla, si tarda más de 2 s, si la máscara es vacía, menor al 2 % o mayor al 95 % de la foto, si su nitidez es menor a 0.85, o si menos del 40 % de la atención del modelo cae dentro de ella. `SEGMENTACION=false` la apaga.
+
 ## Endpoints
 
 | Método | Ruta | Auth |

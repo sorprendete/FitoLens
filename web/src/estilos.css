@@ -597,3 +597,7 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 .vision-leyenda i { flex: 1; height: 10px; border-radius: 99px; background: linear-gradient(90deg, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000); }
 .vision-opacidad { display: flex; align-items: center; gap: 10px; font-size: .82rem; color: var(--tenue); }
 .vision-opacidad input { flex: 1; accent-color: var(--acento); }
+
+/* Contorno de la hoja detectada (segmentación): línea fina, visible en ambos modos */
+.marco .contorno-hoja { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.contorno-hoja polygon { fill: none; stroke: #fff; stroke-width: 1.5; stroke-dasharray: 6 4; stroke-linejoin: round; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }

@@ -26,3 +26,6 @@ datos/
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Modelo de segmentación de la hoja (pequeño, va con el código)
+!api/app/ia/recursos/*.onnx

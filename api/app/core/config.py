@@ -22,6 +22,7 @@ class Ajustes(BaseSettings):
     # Modelos de IA
     modelos_dir: Path = Path("/modelos")
     ort_hilos: int = 2  # hilos de ONNX Runtime por modelo
+    segmentacion: bool = True  # ubica la hoja para el contorno y el mapa de calor (no cambia el diagnóstico)
     modelos_version: str = ""  # Release de GitHub instalado (MODELOS_VERSION en .env), solo informativo
 
     # Imágenes

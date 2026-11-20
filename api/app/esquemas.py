@@ -31,6 +31,9 @@ class DiagnosticoSalida(BaseModel):
     confianza: float | None
     top3: list[Top]
     mapa_calor_png_base64: str | None
+    # Hoja/fruto ubicado: polígonos de puntos [x, y] en 0-1 del encuadre de la foto. Vacío si mascara_ok es False.
+    mascara_ok: bool = False
+    contorno_hoja: list[list[list[float]]] = []
     pasos: list[Paso]
     modelo_version: str
     motivo: str | None

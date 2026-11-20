@@ -94,7 +94,7 @@ export default function Diagnostico() {
       ) : (
         <div className="diag-grid">
           <div>
-            <MapaCalor foto={foto} calor={res?.mapa_calor_png_base64} cargando={cargando} />
+            <MapaCalor foto={foto} calor={res?.mapa_calor_png_base64} contorno={res?.contorno_hoja} mascaraOk={res?.mascara_ok === true} cargando={cargando} />
             <div className="acciones">
               <button className="btn" onClick={() => setCamara(true)}><Camera />Otra foto</button>
               <button className="btn sec" onClick={() => entrada.current.click()}><ImageUp />Subir</button>

@@ -21,7 +21,7 @@ def test_diagnostico_completo(cliente):
     assert 0.3 <= d["confianza"] <= 1
     # Solo clases del cultivo elegido por el router, y renormalizadas
     assert all(t["clase"].startswith("tomate_") for t in d["top3"])
-    assert [p["id"] for p in d["pasos"]] == ["router", "especialista", "calibracion", "mapa_calor"]
+    assert [p["id"] for p in d["pasos"]] == ["router", "especialista", "calibracion", "segmentacion", "mapa_calor"]
     assert d["modelo_version"] == "router@0.0.1-falso+hortalizas@0.0.1-falso"
 
 

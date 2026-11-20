@@ -15,7 +15,7 @@ from app.rutas import admin, alertas, auth, brotes, diagnostico, historial, metr
 async def ciclo(app: FastAPI):
     a = ajustes()
     configurar_logs(a.log_nivel)
-    app.state.registro = cargar(a.modelos_dir, a.ort_hilos)
+    app.state.registro = cargar(a.modelos_dir, a.ort_hilos, segmentar=a.segmentacion)
     with fabrica()() as sesion:
         auth.asegurar_admin(sesion)
     yield
