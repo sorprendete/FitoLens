@@ -44,3 +44,6 @@ ios/
 
 # APK compilado localmente
 *.apk
+
+# El código nativo del módulo local sí va en git
+!modules/*/android/

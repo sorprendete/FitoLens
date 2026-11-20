@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Ruta que expone la carpeta de actualizaciones mediante FileProvider. -->
+<paths>
+    <external-files-path name="actualizaciones" path="actualizaciones/" />
+</paths>
