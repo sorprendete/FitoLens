@@ -1,0 +1,87 @@
+# Cada push a main: prueba, construye las imágenes, las publica en GHCR y actualiza el VPS.
+# Secretos necesarios (Settings > Secrets and variables > Actions):
+#   VPS_HOST   IP del VPS
+#   VPS_USER   fitolens
+#   VPS_SSH_KEY  llave privada SSH que entra como fitolens
+name: Desplegar
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: desplegar
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        if: hashFiles('api/requirements*.txt') != ''
+        with: { python-version: "3.12", cache: pip }
+      - name: Pruebas de la API
+        if: hashFiles('api/requirements*.txt') != ''
+        working-directory: api
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+      - name: Pruebas del bot
+        if: hashFiles('bot/requirements*.txt') != ''
+        working-directory: bot
+        run: |
+          pip install -r requirements-dev.txt
+          pytest -q
+      - name: Validar docker-compose
+        working-directory: despliegue
+        run: cp .env.example .env && docker compose config -q
+
+  imagenes:
+    needs: pruebas
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        servicio: [api, web, bot]
+    steps:
+      - uses: actions/checkout@v4
+      - id: hay
+        run: echo "dockerfile=$([ -f ${{ matrix.servicio }}/Dockerfile ] && echo si || echo no)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+        if: steps.hay.outputs.dockerfile == 'si'
+      - uses: docker/login-action@v3
+        if: steps.hay.outputs.dockerfile == 'si'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Etiqueta de versión
+        if: steps.hay.outputs.dockerfile == 'si'
+        run: echo "VERSION=$(date -u +%Y.%m.%d)-${{ github.run_number }}" >> "$GITHUB_ENV"
+      - uses: docker/build-push-action@v6
+        if: steps.hay.outputs.dockerfile == 'si'
+        with:
+          context: ${{ matrix.servicio }}
+          push: true
+          tags: |
+            ghcr.io/sorprendete/fitolens-${{ matrix.servicio }}:latest
+            ghcr.io/sorprendete/fitolens-${{ matrix.servicio }}:${{ env.VERSION }}
+          cache-from: type=gha,scope=${{ matrix.servicio }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.servicio }}
+
+  vps:
+    needs: imagenes
+    runs-on: ubuntu-latest
+    if: ${{ vars.DESPLIEGUE_ACTIVO == 'si' }}   # se activa cuando el VPS ya está preparado
+    steps:
+      - uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: cd /opt/fitolens/despliegue && ./fitolens.sh actualizar

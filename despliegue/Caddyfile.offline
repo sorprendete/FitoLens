@@ -1,0 +1,13 @@
+# Plan B: laptop sin internet. HTTP simple en la red local (hotspot del celular o router).
+:80 {
+	encode gzip
+	request_body {
+		max_size 15MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:80
+	}
+}

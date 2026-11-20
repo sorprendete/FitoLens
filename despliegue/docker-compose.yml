@@ -1,0 +1,86 @@
+# FitoLens: todo el sistema en un archivo.
+# Uso normal (VPS):   ./fitolens.sh actualizar
+# Plan B (laptop):    ./fitolens.sh offline
+name: fitolens
+
+x-comun: &comun
+  restart: unless-stopped
+  env_file: .env
+  logging:
+    driver: json-file
+    options: { max-size: "10m", max-file: "3" }   # los logs nunca llenan el disco
+
+services:
+  caddy:
+    <<: *comun
+    image: caddy:2.8-alpine
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data          # certificados HTTPS
+      - caddy_config:/config
+    depends_on: [web, api]
+
+  web:
+    <<: *comun
+    image: ${REGISTRO:-ghcr.io/sorprendete}/fitolens-web:${VERSION:-latest}
+    build: ../web                  # sirve el React compilado en el puerto 80 interno
+
+  api:
+    <<: *comun
+    image: ${REGISTRO:-ghcr.io/sorprendete}/fitolens-api:${VERSION:-latest}
+    build: ../api
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      MODELOS_DIR: /modelos
+    volumes:
+      - ../modelos:/modelos:ro      # cambiar un modelo = copiar carpeta + ./fitolens.sh reiniciar api
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://localhost:8000/api/salud')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources: { limits: { memory: 6g } }
+
+  db:
+    <<: *comun
+    image: postgres:16-alpine
+    volumes: [db_datos:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  bot:
+    <<: *comun
+    image: ${REGISTRO:-ghcr.io/sorprendete}/fitolens-bot:${VERSION:-latest}
+    build: ../bot
+    environment:
+      API_URL: http://api:8000
+    depends_on: [api]
+    profiles: [bot]                # solo arranca si COMPOSE_PROFILES incluye bot
+
+  backup:
+    <<: *comun
+    image: postgres:16-alpine
+    entrypoint: ["/bin/sh", "/respaldo.sh", "bucle"]
+    volumes:
+      - ./scripts/respaldo.sh:/respaldo.sh:ro
+      - ../respaldos:/respaldos
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+    depends_on:
+      db: { condition: service_healthy }
+    profiles: [online]             # en la laptop offline no hace falta
+
+volumes:
+  db_datos:
+  caddy_datos:
+  caddy_config:

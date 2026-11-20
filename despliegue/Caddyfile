@@ -1,0 +1,28 @@
+# VPS: HTTPS automático (Let's Encrypt) para el DOMINIO de .env
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMINIO} {
+	encode zstd gzip
+	request_body {
+		max_size 15MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /bot/* {
+		reverse_proxy bot:8080
+	}
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

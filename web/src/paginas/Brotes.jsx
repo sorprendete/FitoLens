@@ -1,0 +1,114 @@
+import { useEffect, useMemo, useState } from 'react'
+import { obtenerBrotes } from '../api/cliente'
+import { REFRESCO_BROTES } from '../config'
+import { CULTIVOS, esSana, infoClase } from '../datos/clases'
+import { PROVINCIAS, VIEWBOX } from '../datos/provincias'
+import { fechaHace } from '../datos/utiles'
+
+const PERIODOS = [[7, '7 días'], [30, '30 días'], [90, '90 días']]
+
+// Escala de color de bajo (verde oscuro) a alto (ámbar → rojo).
+function color(v) {
+  if (!v) return 'var(--mapa-vacio)'
+  const h = 140 - 135 * v, l = 28 + 22 * v
+  return `hsl(${h} 70% ${l}%)`
+}
+
+export default function Brotes() {
+  const [dias, setDias] = useState(30)
+  const [cultivo, setCultivo] = useState('')
+  const [datos, setDatos] = useState(null)
+  const [sel, setSel] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let vivo = true
+    const cargar = () => obtenerBrotes(fechaHace(dias)).then((d) => vivo && (setDatos(d), setError('')))
+      .catch((e) => vivo && setError(e.message))
+    cargar()
+    const t = setInterval(cargar, REFRESCO_BROTES)
+    return () => { vivo = false; clearInterval(t) }
+  }, [dias])
+
+  // Conteo por provincia de casos enfermos (se excluyen las clases "sana") del cultivo elegido.
+  const conteo = useMemo(() => {
+    const m = {}
+    for (const p of datos?.provincias ?? []) {
+      const pc = Object.entries(p.por_clase ?? {}).filter(([c]) => !esSana(c) && (!cultivo || c.startsWith(cultivo + '_')))
+      m[p.provincia] = { total: pc.reduce((a, [, n]) => a + n, 0), clases: pc.sort((a, b) => b[1] - a[1]) }
+    }
+    return m
+  }, [datos, cultivo])
+
+  const max = Math.max(1, ...Object.values(conteo).map((c) => c.total))
+  const ranking = PROVINCIAS.map((p) => ({ ...p, ...(conteo[p.id] ?? { total: 0, clases: [] }) })).sort((a, b) => b.total - a.total)
+  const total = ranking.reduce((a, p) => a + p.total, 0)
+  const activa = ranking.find((p) => p.id === sel) ?? ranking[0]
+
+  return (
+    <section>
+      <header className="encabezado">
+        <div>
+          <p className="sobretitulo">Vigilancia fitosanitaria · Región San Martín</p>
+          <h1>Mapa de brotes</h1>
+          <p className="tenue">Casos con enfermedad detectados por FitoLens en cada provincia. Se actualiza solo cada {REFRESCO_BROTES / 1000} s.</p>
+        </div>
+        <div className="filtros">
+          <div className="segmentado" role="group" aria-label="Periodo">
+            {PERIODOS.map(([d, t]) => <button key={d} aria-pressed={dias === d} onClick={() => setDias(d)}>{t}</button>)}
+          </div>
+          <select value={cultivo} onChange={(e) => setCultivo(e.target.value)} aria-label="Cultivo">
+            <option value="">Todos los cultivos</option>
+            {Object.entries(CULTIVOS).map(([id, c]) => <option key={id} value={id}>{c.nombre}</option>)}
+          </select>
+        </div>
+      </header>
+      {error && <p className="aviso mal">{error}</p>}
+
+      <div className="brotes-grid">
+        <div className="tarjeta mapa">
+          <svg viewBox={VIEWBOX} role="img" aria-label="Mapa de San Martín por provincias">
+            {PROVINCIAS.map((p) => {
+              const n = conteo[p.id]?.total ?? 0
+              return (
+                <path key={p.id} d={p.d} fill={color(n / max)} className={activa?.id === p.id ? 'activa' : ''}
+                  tabIndex="0" onMouseEnter={() => setSel(p.id)} onFocus={() => setSel(p.id)} onClick={() => setSel(p.id)}>
+                  <title>{`${p.nombre}: ${n} casos`}</title>
+                </path>
+              )
+            })}
+            {PROVINCIAS.map((p) => (
+              <text key={p.id} x={p.cx} y={p.cy} className="mapa-nombre">{p.nombre}</text>
+            ))}
+          </svg>
+          <div className="leyenda"><span>Menos casos</span><i /><span>Más casos</span></div>
+        </div>
+
+        <div className="columna">
+          <div className="tarjeta kpi">
+            <span>Casos con enfermedad</span><b>{total.toLocaleString('es-PE')}</b>
+            <small className="tenue">últimos {dias} días{cultivo && ` · ${CULTIVOS[cultivo].nombre}`}</small>
+          </div>
+          {activa && (
+            <div className="tarjeta">
+              <h2>{activa.nombre}</h2>
+              <p className="tenue">{activa.total} casos</p>
+              {activa.clases.slice(0, 5).map(([c, n]) => (
+                <div key={c} className="fila"><span>{CULTIVOS[c.split('_')[0]]?.nombre} · {infoClase(c).nombre}</span><b>{n}</b></div>
+              ))}
+              {!activa.clases.length && <p className="tenue">Sin casos registrados.</p>}
+            </div>
+          )}
+          <div className="tarjeta">
+            <h2>Provincias</h2>
+            {ranking.map((p) => (
+              <button key={p.id} className={`fila boton-fila ${activa?.id === p.id ? 'sel' : ''}`} onClick={() => setSel(p.id)}>
+                <span><i className="punto" style={{ background: color(p.total / max) }} />{p.nombre}</span><b>{p.total}</b>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
