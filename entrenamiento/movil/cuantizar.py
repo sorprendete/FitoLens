@@ -90,65 +90,107 @@ def procesar(carpeta: Path, salida: Path, fotos_dir: Path | None, maximo: int, m
     fp32 = carpeta / "model.onnx"
     if man.get("sha256") and sha(fp32) != man["sha256"]:
         raise SystemExit(f"{carpeta.name}: sha256 de model.onnx no coincide con el manifest")
+    # El contrato pide id de texto; algunos manifests traen id numérico y el texto en "nombre".
+    man["clases"] = [{**c, "id": c["nombre"]} if isinstance(c["id"], int) else c for c in man["clases"]]
     ids = [c["id"] for c in man["clases"]]
     alto, ancho = man["entrada"]["alto"], man["entrada"]["ancho"]
     fotos = listar_fotos(fotos_dir, ids, maximo)
     tensores = lote(fotos, alto, ancho)
 
-    with tempfile.TemporaryDirectory() as tmp:
-        int8, prep = Path(tmp) / "int8.onnx", Path(tmp) / "prep.onnx"
-        try:  # optimiza e infiere formas antes de cuantizar (mejor INT8)
-            quant_pre_process(str(fp32), str(prep))
-        except Exception:
-            shutil.copyfile(fp32, prep)
-        if fotos:
-            metodo = "estatica_qdq"
-            quantize_static(str(prep), str(int8), Calibrador(tensores[: min(100, len(tensores))]),
-                            quant_format=QuantFormat.QDQ, per_channel=True,
-                            activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8)
-        else:
-            metodo = "dinamica"
-            quantize_dynamic(str(prep), str(int8), weight_type=QuantType.QUInt8)
+    t = man.get("temperatura", 1.0)
+    etiq = [(i, y) for i, (_, y) in enumerate(fotos) if y is not None]
+    p32 = softmax(predecir(fp32, tensores), t)
 
-        t = man.get("temperatura", 1.0)
-        p32, p8 = softmax(predecir(fp32, tensores), t), softmax(predecir(int8, tensores), t)
-        comp = {
-            "n": len(tensores),
-            "fotos_reales": bool(fotos),
-            "coincidencia": round(float((p32.argmax(1) == p8.argmax(1)).mean()), 4),
-            "dif_max_prob": round(float(np.abs(p32 - p8).max()), 4),
-        }
-        etiq = [(i, y) for i, (_, y) in enumerate(fotos) if y is not None]
+    def comparar(ruta: Path) -> dict:
+        p8 = softmax(predecir(ruta, tensores), t)
+        c = {"coincidencia": round(float((p32.argmax(1) == p8.argmax(1)).mean()), 4),
+             "dif_max_prob": round(float(np.abs(p32 - p8).max()), 4)}
         if etiq:
             idx, y = map(np.array, zip(*etiq))
-            comp["accuracy_fp32"] = round(float((p32[idx].argmax(1) == y).mean()), 4)
-            comp["accuracy_int8"] = round(float((p8[idx].argmax(1) == y).mean()), 4)
-            perdida = comp["accuracy_fp32"] - comp["accuracy_int8"]
-        else:
-            perdida = 1 - comp["coincidencia"]
-        comp["perdida"] = round(float(perdida), 4)
+            c["accuracy_fp32"] = round(float((p32[idx].argmax(1) == y).mean()), 4)
+            c["accuracy_int8"] = round(float((p8[idx].argmax(1) == y).mean()), 4)
+        # Pérdida = la peor entre caída de accuracy y desacuerdo con FP32 (con pocas fotos, la
+        # accuracy sola engaña: un INT8 que cambia 1 de cada 3 respuestas puede "acertar más").
+        caida = c.get("accuracy_fp32", 1) - c.get("accuracy_int8", 1)
+        c["perdida"] = round(float(max(caida, 1 - c["coincidencia"])), 4)
+        return c
 
-        usar_int8 = perdida <= max_perdida
-        elegido = int8 if usar_int8 else fp32
+    with tempfile.TemporaryDirectory() as tmp:
+        prep = Path(tmp) / "prep.onnx"
+        try:  # optimiza e infiere formas antes de cuantizar (requiere sympy)
+            quant_pre_process(str(fp32), str(prep))
+        except Exception as e:
+            print(f"  aviso: sin pre-proceso ({e.__class__.__name__}); instala sympy")
+            shutil.copyfile(fp32, prep)
+        arreglar_gemm(prep)
+
+        candidatos = {
+            "dinamica_matmul": lambda o: quantize_dynamic(str(prep), str(o), weight_type=QuantType.QInt8,
+                                                          op_types_to_quantize=["MatMul", "Gemm"]),
+            "dinamica": lambda o: quantize_dynamic(str(prep), str(o), weight_type=QuantType.QUInt8),
+        }
+        if fotos:
+            candidatos["estatica_qdq"] = lambda o: quantize_static(
+                str(prep), str(o), Calibrador(tensores[:100]), quant_format=QuantFormat.QDQ,
+                per_channel=True, activation_type=QuantType.QUInt8, weight_type=QuantType.QInt8)
+
+        probados, mejor = {}, None
+        for metodo, cuantizar in candidatos.items():
+            ruta = Path(tmp) / f"{metodo}.onnx"
+            try:
+                cuantizar(ruta)
+                c = comparar(ruta) | {"tamano_mb": round(ruta.stat().st_size / 2**20, 2)}
+            except Exception as e:
+                probados[metodo] = {"error": str(e)[:200]}
+                continue
+            probados[metodo] = c
+            ok = c["perdida"] <= max_perdida and c["tamano_mb"] < fp32.stat().st_size / 2**20 * 0.9
+            if ok and (mejor is None or c["tamano_mb"] < probados[mejor[0]]["tamano_mb"]):
+                mejor = (metodo, ruta)
+
         destino = salida / f"{man['nombre']}.onnx"
-        shutil.copyfile(elegido, destino)
+        shutil.copyfile(mejor[1] if mejor else fp32, destino)
 
+    metodo = mejor[0] if mejor else None
     info = {
         "nombre": man["nombre"], "version": man.get("version"), "tipo": man.get("tipo"),
-        "archivo": destino.name, "precision": "int8" if usar_int8 else "fp32",
+        "archivo": destino.name, "precision": "int8" if mejor else "fp32",
         "cuantizacion": metodo, "sha256": sha(destino),
         "tamano_mb": round(destino.stat().st_size / 2**20, 2),
         "tamano_fp32_mb": round(fp32.stat().st_size / 2**20, 2),
         "clases": man["clases"], "entrada": man["entrada"], "salidas": man.get("salidas"),
-        "temperatura": t, "umbral": man.get("umbral", 0.6), "comparacion": comp,
+        "temperatura": t, "umbral": man.get("umbral", 0.6),
+        "comparacion": {"n": len(tensores), "fotos_reales": bool(fotos), "metodos": probados},
     }
     for k in ("rechazo", "especialistas"):
         if k in man:
             info[k] = man[k]
-    aviso = "" if usar_int8 else f"  ⚠ pérdida {perdida:.1%} > {max_perdida:.1%}: se deja FP32"
-    print(f"{man['nombre']:<11} {info['tamano_fp32_mb']:>6} MB → {info['tamano_mb']:>6} MB  "
-          f"coincidencia {comp['coincidencia']:.1%}  n={comp['n']}{'' if fotos else ' (sin fotos: aleatorio)'}{aviso}")
+    print(f"{man['nombre']:<11} {info['tamano_fp32_mb']:>7} MB → {info['tamano_mb']:>7} MB  "
+          f"{metodo or 'FP32 (ningún INT8 cumplió)'}  n={len(tensores)}{'' if fotos else ' (aleatorio)'}")
+    for m, c in probados.items():
+        print(f"    {m:<16} {c}")
     return info
+
+
+def arreglar_gemm(ruta: Path) -> None:
+    """Gemm con transB=1 que comparten peso (TTA): onnxruntime los pasa a MatMul transponiendo el
+    peso una vez por nodo y rompe el modelo. Se transpone una sola vez aquí y se deja transB=0."""
+    import onnx
+    from onnx import numpy_helper
+    m = onnx.load(str(ruta))
+    inits = {i.name: i for i in m.graph.initializer}
+    hechos = {}
+    for n in m.graph.node:
+        tb = next((a for a in n.attribute if a.name == "transB"), None)
+        if n.op_type != "Gemm" or not tb or tb.i != 1 or n.input[1] not in inits:
+            continue
+        w = n.input[1]
+        if w not in hechos:
+            hechos[w] = w + "_T"
+            m.graph.initializer.append(numpy_helper.from_array(numpy_helper.to_array(inits[w]).T.copy(), hechos[w]))
+        n.input[1], tb.i = hechos[w], 0
+    if hechos:
+        onnx.save(m, str(ruta))
 
 
 def main():
