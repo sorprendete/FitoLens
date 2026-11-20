@@ -1,0 +1,25 @@
+# VPS compartido: el nginx del servidor tiene los puertos 80/443 y el HTTPS (certbot).
+# Caddy solo escucha HTTP en 127.0.0.1:8088 y reparte a web, api y bot.
+# Se activa con CADDYFILE=Caddyfile.nginx en .env y docker-compose.override.yml (ver docs/instalar_vps.md).
+:80 {
+	encode zstd gzip
+	request_body {
+		max_size 15MB
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle /bot/* {
+		reverse_proxy bot:8080
+	}
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+}

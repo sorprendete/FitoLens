@@ -1,5 +1,6 @@
 # Secretos y datos del servidor
 despliegue/.env
+despliegue/docker-compose.override.yml
 .env
 respaldos/
 modelos/
