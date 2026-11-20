@@ -32,7 +32,7 @@ body::before { /* fondo vivo: brillos + rejilla tenue */
     radial-gradient(600px 400px at -10% 110%, color-mix(in srgb, var(--acento-2) 10%, transparent), transparent 70%),
     linear-gradient(var(--borde) 1px, transparent 1px) 0 0 / 44px 44px,
     linear-gradient(90deg, var(--borde) 1px, transparent 1px) 0 0 / 44px 44px;
-  mask-image: radial-gradient(ellipse at 60% 0%, #000 0%, #0008 40%, transparent 85%);
+  opacity: .55; will-change: auto;
 }
 h1, h2, h3, h4 { font-family: var(--titulos); line-height: 1.12; letter-spacing: -.025em; margin: 0 0 .45em; }
 h2 { font-size: 1.35rem; } h3 { font-size: 1.08rem; } h4 { font-size: .95rem; margin-top: 1em; }
@@ -50,7 +50,7 @@ button, select, input { font: inherit; color: inherit; }
 .titular { font-size: clamp(2rem, 4.6vw, 3.6rem); font-weight: 700; }
 .apilado { display: flex; flex-direction: column; gap: 20px; }
 .enlace { color: var(--acento); text-decoration: none; font-weight: 600; font-size: .9rem; }
-@keyframes subir { from { opacity: 0; transform: translateY(12px); } }
+@keyframes subir { from { opacity: 0; transform: translateY(6px); } }
 @keyframes aparecer { from { opacity: 0; } }
 @keyframes girar { to { transform: rotate(360deg); } }
 
@@ -66,8 +66,7 @@ button, select, input { font: inherit; color: inherit; }
 .btn.grande { padding: 16px 26px; font-size: 1.05rem; border-radius: 16px; }
 .btn.chico { padding: 6px 12px; font-size: .85rem; }
 .btn.ancho { width: 100%; }
-.btn.brillo { animation: latido 2.6s ease-in-out infinite; }
-@keyframes latido { 50% { box-shadow: 0 0 0 1px #4ade8066, 0 10px 50px -4px #4ade80aa; } }
+.btn.brillo { box-shadow: 0 0 0 1px #4ade8066, 0 12px 44px -6px #4ade80aa; }
 .icono-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--radio-s); cursor: pointer;
   background: var(--sup); color: var(--texto); box-shadow: inset 0 0 0 1px var(--borde); transition: box-shadow .2s; }
 .icono-btn:hover { box-shadow: inset 0 0 0 1px var(--acento); }
@@ -87,7 +86,7 @@ select { padding: 0 12px; cursor: pointer; }
 .buscador { flex: 1; min-width: 220px; }
 
 /* ---------- 4. Superficies ---------- */
-.tarjeta { position: relative; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 22px; box-shadow: var(--sombra); animation: subir .45s ease both; }
+.tarjeta { position: relative; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 22px; box-shadow: var(--sombra); animation: subir .3s ease both; }
 .tarjeta.sin-relleno { padding: 0; overflow: hidden; }
 .tarjeta-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
 .tarjeta-cab h3 { margin: 0; }
@@ -122,7 +121,7 @@ select { padding: 0 12px; cursor: pointer; }
 /* ---------- 5. Estructura (menú lateral) ---------- */
 .app { display: grid; grid-template-columns: var(--lateral) minmax(0, 1fr); min-height: 100dvh; }
 .lateral { position: sticky; top: 0; height: 100dvh; display: flex; flex-direction: column; padding: 18px 14px; gap: 14px;
-  background: color-mix(in srgb, var(--sup) 70%, transparent); border-right: 1px solid var(--borde); backdrop-filter: blur(14px); overflow-y: auto; }
+  background: var(--sup); border-right: 1px solid var(--borde); overflow-y: auto; }
 .lateral-cab { display: flex; justify-content: space-between; align-items: center; padding: 0 6px 6px; }
 .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; }
 .logo img { border-radius: 11px; box-shadow: var(--brillo); }
@@ -145,11 +144,11 @@ select { padding: 0 12px; cursor: pointer; }
   background: linear-gradient(135deg, var(--acento), var(--acento-2)); color: var(--sobre-acento); }
 .avatar.chico { width: 32px; height: 32px; border-radius: 10px; font-size: .85rem; }
 .contenido { min-width: 0; display: flex; flex-direction: column; }
-.superior { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 14px 32px; background: var(--vidrio); backdrop-filter: blur(14px); border-bottom: 1px solid var(--borde); }
+.superior { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 14px 32px; background: color-mix(in srgb, var(--fondo) 94%, transparent); border-bottom: 1px solid var(--borde); }
 .titulo-pagina { font-size: 1.15rem; margin: 0; }
 .superior-der { margin-left: auto; display: flex; align-items: center; gap: 10px; }
 .chip-demo { padding: 5px 12px; border-radius: 999px; font-size: .75rem; font-weight: 700; color: var(--aviso); background: color-mix(in srgb, var(--aviso) 14%, transparent); border: 1px solid color-mix(in srgb, var(--aviso) 30%, transparent); }
-.pagina { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; animation: aparecer .35s ease; }
+.pagina { flex: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 28px 32px 40px; animation: aparecer .2s ease; }
 .pie { text-align: center; color: var(--tenue); font-size: .78rem; padding: 18px 16px 28px; }
 .solo-movil, .nav-movil, .velo { display: none; }
 @media (max-width: 960px) {
@@ -162,7 +161,7 @@ select { padding: 0 12px; cursor: pointer; }
   .pagina { padding: 20px 16px 110px; }
   .pie { padding-bottom: 100px; }
   .nav-movil { display: flex; position: fixed; z-index: 40; left: 10px; right: 10px; bottom: calc(10px + env(safe-area-inset-bottom)); justify-content: space-around;
-    padding: 6px; border-radius: 20px; background: var(--vidrio); backdrop-filter: blur(16px); border: 1px solid var(--borde-2); box-shadow: 0 10px 40px #0006; }
+    padding: 6px; border-radius: 20px; background: var(--sup); border: 1px solid var(--borde-2); box-shadow: 0 10px 40px #0006; }
   .nav-movil a, .nav-movil button { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 7px 2px; border: 0; background: none; border-radius: 14px;
     font-size: .68rem; font-weight: 600; color: var(--tenue); text-decoration: none; cursor: pointer; }
   .nav-movil [aria-current] { color: var(--acento); background: color-mix(in srgb, var(--acento) 12%, transparent); }

@@ -42,7 +42,7 @@ function Ficha({ m }) {
       <Barra etiqueta="F1 macro (equilibrio entre clases)" valor={campo.f1_macro ?? 0} />
       {m.laboratorio?.accuracy != null && <Barra etiqueta="Acierto en laboratorio (referencia)" valor={m.laboratorio.accuracy} tono="tenue" />}
       <p className="tenue pequeno">{campo.n ?? '—'} fotos de prueba · umbral {Math.round((m.umbral ?? 0) * 100)} % · {m.latencia_ms ?? '—'} ms por foto en CPU</p>
-      {campo.matriz_confusion && <Matriz clases={m.clases} matriz={campo.matriz_confusion} />}
+      {campo.matriz_confusion && m.clases?.length > 0 && <Matriz clases={m.clases} matriz={campo.matriz_confusion} />}
     </article>
   )
 }
