@@ -3,15 +3,15 @@ import { obtenerBrotes } from '../api/cliente'
 import { REFRESCO_BROTES } from '../config'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
 import { PROVINCIAS, VIEWBOX } from '../datos/provincias'
+import { escala } from '../datos/paleta'
 import { fechaHace } from '../datos/utiles'
 
 const PERIODOS = [[7, '7 días'], [30, '30 días'], [90, '90 días']]
 
-// Escala de color de bajo (verde oscuro) a alto (ámbar → rojo).
+// Escala de color de bajo (azul) a alto (violeta → rosa → ámbar).
 function color(v) {
   if (!v) return 'var(--mapa-vacio)'
-  const h = 140 - 135 * v, l = 28 + 22 * v
-  return `hsl(${h} 70% ${l}%)`
+  return escala(0.08 + v * 0.92)
 }
 
 export default function Brotes() {

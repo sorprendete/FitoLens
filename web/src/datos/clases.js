@@ -3,11 +3,11 @@
 // Las dosis se toman siempre de la etiqueta del producto registrado en SENASA.
 
 export const CULTIVOS = {
-  cafe: { nombre: 'Café', cientifico: 'Coffea arabica', color: '#c08552' },
-  cacao: { nombre: 'Cacao', cientifico: 'Theobroma cacao', color: '#e07a5f' },
-  papa: { nombre: 'Papa', cientifico: 'Solanum tuberosum', color: '#d4a373' },
-  tomate: { nombre: 'Tomate', cientifico: 'Solanum lycopersicum', color: '#ef476f' },
-  pimiento: { nombre: 'Pimiento', cientifico: 'Capsicum annuum', color: '#06d6a0' },
+  cafe: { nombre: 'Café', cientifico: 'Coffea arabica', color: '#a78bfa' },
+  cacao: { nombre: 'Cacao', cientifico: 'Theobroma cacao', color: '#fb923c' },
+  papa: { nombre: 'Papa', cientifico: 'Solanum tuberosum', color: '#fbbf24' },
+  tomate: { nombre: 'Tomate', cientifico: 'Solanum lycopersicum', color: '#f472b6' },
+  pimiento: { nombre: 'Pimiento', cientifico: 'Capsicum annuum', color: '#34d399' },
 }
 
 const C = (nombre, agente, consejo, urgencia = 'media') => ({ nombre, agente, consejo, urgencia })

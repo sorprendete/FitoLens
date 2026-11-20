@@ -36,7 +36,7 @@ export default function Panel() {
         <Kpi icono={Activity} titulo="Diagnósticos" valor={e.total} sub={`${e.semana} en los últimos 7 días`} />
         <Kpi icono={Leaf} titulo="Plantas sanas" valor={pct(e.sanas / (e.concluyentes || 1))} sub={`${e.sanas} de ${e.concluyentes} concluyentes`} tono="ok" />
         <Kpi icono={AlertTriangle} titulo="Con enfermedad" valor={pct(e.enfermas / (e.concluyentes || 1))} sub={`${e.enfermas} casos`} tono="mal" />
-        <Kpi icono={Gauge} titulo="Confianza media" valor={pct(e.confianza)} sub={`${e.dudosas} no concluyentes`} tono="aviso" />
+        <Kpi icono={Gauge} titulo="Confianza media" valor={pct(e.confianza)} sub={`${e.dudosas} no concluyentes`} tono="violeta" />
       </div>
 
       {items && !items.length ? (

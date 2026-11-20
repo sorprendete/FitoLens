@@ -49,7 +49,7 @@ export default function Amenazas() {
             <Kpi icono={ShieldCheck} titulo="Eventos analizados" valor={d.resumen.eventos.toLocaleString('es-PE')} sub={`${d.resumen.ips} IPs distintas`} />
             <Kpi icono={ShieldAlert} titulo="Riesgo alto" valor={d.resumen.alto} tono="mal" />
             <Kpi icono={TriangleAlert} titulo="Riesgo medio" valor={d.resumen.medio} tono="aviso" />
-            <Kpi icono={BrainCircuit} titulo="Solo lo vio el ML" valor={d.resumen.solo_ml} sub="ninguna regla lo detectó" />
+            <Kpi icono={BrainCircuit} titulo="Solo lo vio el ML" valor={d.resumen.solo_ml} tono="violeta" sub="ninguna regla lo detectó" />
           </div>
 
           <div className="rejilla-2">

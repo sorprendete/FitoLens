@@ -29,16 +29,16 @@ export default function Usuarios() {
       {error && <p className="alerta mal">{error}</p>}
       <div className="rejilla-kpi">
         <Kpi icono={Users} titulo="Usuarios" valor={r?.usuarios ?? '…'} />
-        <Kpi icono={ScanLine} titulo="Diagnósticos" valor={r?.analisis ?? '…'} sub={r && `${r.rechazadas} fotos rechazadas`} />
-        <Kpi icono={Lock} titulo="Logins fallidos (24 h)" valor={r?.logins_fallidos_24h ?? '…'} tono="aviso" />
+        <Kpi icono={ScanLine} titulo="Diagnósticos" valor={r?.analisis ?? '…'} tono="violeta" sub={r && `${r.rechazadas} fotos rechazadas`} />
+        <Kpi icono={Lock} titulo="Logins fallidos (24 h)" valor={r?.logins_fallidos_24h ?? '…'} tono="oro" />
         <Kpi icono={ShieldAlert} titulo="Bloqueos (24 h)" valor={r?.bloqueos_24h ?? '…'} tono="mal" />
       </div>
       {r && (
         <section className="tarjeta">
           <header className="tarjeta-cab"><h3>Resultados de todos los diagnósticos</h3></header>
           <Dona centro={r.analisis} sub="en total" datos={[
-            { etiqueta: 'Sanas', valor: r.sanos, color: 'var(--ok)' }, { etiqueta: 'Con enfermedad', valor: r.enfermos, color: 'var(--mal)' },
-            { etiqueta: 'No concluyentes', valor: r.no_concluyentes, color: 'var(--aviso)' }, { etiqueta: 'Rechazadas', valor: r.rechazadas ?? 0, color: 'var(--tenue)' }]} />
+            { etiqueta: 'Sanas', valor: r.sanos, color: '#34d399' }, { etiqueta: 'Con enfermedad', valor: r.enfermos, color: '#fb7185' },
+            { etiqueta: 'No concluyentes', valor: r.no_concluyentes, color: '#fbbf24' }, { etiqueta: 'Rechazadas', valor: r.rechazadas ?? 0, color: '#94a3b8' }]} />
         </section>
       )}
       <section className="tarjeta sin-relleno">

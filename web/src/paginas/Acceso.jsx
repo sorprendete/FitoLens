@@ -6,6 +6,8 @@ import { usarTema } from '../datos/tema'
 
 // Fuerza de la contraseña: 0 a 4 (longitud, mayúsculas/minúsculas, números, símbolos).
 const fuerza = (p) => [p.length >= 8, /[a-z]/.test(p) && /[A-Z]/.test(p), /\d/.test(p), /[^\w\s]/.test(p) || p.length >= 12].filter(Boolean).length
+// Partículas de luz que suben por la portada (posiciones fijas para que no cambien en cada render).
+const PARTICULAS = Array.from({ length: 18 }, (_, i) => ({ left: `${(i * 37) % 100}%`, animationDelay: `${(i * 1.7) % 14}s`, animationDuration: `${11 + (i % 5) * 2}s` }))
 const TXT_FUERZA = ['Muy débil', 'Débil', 'Aceptable', 'Buena', 'Fuerte']
 
 export default function Acceso({ modo }) {
@@ -36,6 +38,7 @@ export default function Acceso({ modo }) {
     <div className="acceso">
       <section className="heroe">
         <div className="heroe-fondo" aria-hidden="true" />
+        <div className="particulas" aria-hidden="true">{PARTICULAS.map((p, i) => <i key={i} style={p} />)}</div>
         <Logo />
         <div className="heroe-cuerpo">
           <p className="sobre">EXPOFERIA FISI 2026 · San Martín</p>
