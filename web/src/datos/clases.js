@@ -1,13 +1,15 @@
 // Nombres y consejos por clase. La API puede enviar su propia "etiqueta"; si no, se usa este catálogo.
+// Color fijo por cultivo, representativo: café = marrón del grano tostado, cacao = naranja de la mazorca,
+// papa = morado de la papa nativa, tomate = rojo del fruto, pimiento = amarillo del morrón.
 // Ids: snake_case en español con prefijo de cultivo (mismo criterio que manifest.json de cada modelo).
 // Las dosis se toman siempre de la etiqueta del producto registrado en SENASA.
 
 export const CULTIVOS = {
-  cafe: { nombre: 'Café', cientifico: 'Coffea arabica', color: '#a78bfa' },
-  cacao: { nombre: 'Cacao', cientifico: 'Theobroma cacao', color: '#fb923c' },
-  papa: { nombre: 'Papa', cientifico: 'Solanum tuberosum', color: '#fbbf24' },
-  tomate: { nombre: 'Tomate', cientifico: 'Solanum lycopersicum', color: '#f472b6' },
-  pimiento: { nombre: 'Pimiento', cientifico: 'Capsicum annuum', color: '#34d399' },
+  cafe: { nombre: 'Café', cientifico: 'Coffea arabica', color: '#c08457' },
+  cacao: { nombre: 'Cacao', cientifico: 'Theobroma cacao', color: '#f97316' },
+  papa: { nombre: 'Papa', cientifico: 'Solanum tuberosum', color: '#a78bfa' },
+  tomate: { nombre: 'Tomate', cientifico: 'Solanum lycopersicum', color: '#ef4444' },
+  pimiento: { nombre: 'Pimiento', cientifico: 'Capsicum annuum', color: '#facc15' },
 }
 
 const C = (nombre, agente, consejo, urgencia = 'media') => ({ nombre, agente, consejo, urgencia })

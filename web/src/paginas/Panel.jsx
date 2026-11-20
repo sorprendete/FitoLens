@@ -1,7 +1,8 @@
 import { Activity, AlertTriangle, Gauge, Leaf, ScanLine } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { obtenerHistorial, obtenerMetricas } from '../api/cliente'
-import { Columnas, Dona, Kpi, Ranking } from '../componentes/Graficos'
+import { Columnas, Dona, Kpi, Leyenda, Ranking } from '../componentes/Graficos'
+import { ESTADO } from '../datos/paleta'
 import { useSesion } from '../contexto/Sesion'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
 import { pct } from '../datos/utiles'
@@ -36,7 +37,7 @@ export default function Panel() {
         <Kpi icono={Activity} titulo="Diagnósticos" valor={e.total} sub={`${e.semana} en los últimos 7 días`} />
         <Kpi icono={Leaf} titulo="Plantas sanas" valor={pct(e.sanas / (e.concluyentes || 1))} sub={`${e.sanas} de ${e.concluyentes} concluyentes`} tono="ok" />
         <Kpi icono={AlertTriangle} titulo="Con enfermedad" valor={pct(e.enfermas / (e.concluyentes || 1))} sub={`${e.enfermas} casos`} tono="mal" />
-        <Kpi icono={Gauge} titulo="Confianza media" valor={pct(e.confianza)} sub={`${e.dudosas} no concluyentes`} tono="violeta" />
+        <Kpi icono={Gauge} titulo="Confianza media" valor={pct(e.confianza)} sub={`${e.dudosas} no concluyentes`} tono="acento" />
       </div>
 
       {items && !items.length ? (
@@ -49,13 +50,13 @@ export default function Panel() {
       ) : (
         <>
           <section className="tarjeta">
-            <header className="tarjeta-cab"><h3>Diagnósticos por día</h3><span className="tenue">Últimos 14 días</span></header>
+            <header className="tarjeta-cab"><h3>Diagnósticos por día</h3><span className="tenue">Últimos 14 días · por resultado</span></header>
             <Columnas datos={e.porDia} />
           </section>
           <div className="rejilla-2">
             <section className="tarjeta">
               <header className="tarjeta-cab"><h3>Enfermedades más frecuentes</h3></header>
-              {e.top.length ? <Ranking datos={e.top} total={e.enfermas} /> : <p className="tenue">Sin enfermedades detectadas. ¡Bien!</p>}
+              {e.top.length ? <><Ranking datos={e.top} total={e.enfermas} /><Leyenda items={LEYENDA_CULTIVOS} /></> : <p className="tenue">Sin enfermedades detectadas. ¡Bien!</p>}
             </section>
             <section className="tarjeta">
               <header className="tarjeta-cab"><h3>Por cultivo</h3></header>
@@ -70,7 +71,7 @@ export default function Panel() {
           <header className="tarjeta-cab"><h3>Modelos en uso</h3><a href="#modelos" className="enlace">Ver precisión en campo →</a></header>
           <div className="modelos-mini">
             {modelos.map((m) => (
-              <div key={m.id} className="modelo-mini" style={{ '--c': CULTIVOS[m.cultivo]?.color }}>
+              <div key={m.id} className="modelo-mini" style={{ '--c': m.id === 'hortalizas' ? 'var(--acento)' : CULTIVOS[m.cultivo]?.color }}>
                 <span>{m.id === 'hortalizas' ? 'Hortalizas' : CULTIVOS[m.cultivo]?.nombre ?? m.id}</span>
                 <b>{pct(m.campo?.accuracy)}</b><small>acierto en campo</small>
               </div>
@@ -82,6 +83,11 @@ export default function Panel() {
   )
 }
 
+// Leyenda de colores de cultivo (los mismos en toda la web).
+const LEYENDA_CULTIVOS = Object.values(CULTIVOS).map((c) => ({ nombre: c.nombre, color: c.color }))
+
+const estadoDe = (i) => (i.estado === 'diagnostico' ? (esSana(i.clase) ? 'sana' : 'enferma') : i.estado)
+
 function estadisticas(items) {
   const conc = items.filter((i) => i.estado === 'diagnostico')
   const sanas = conc.filter((i) => esSana(i.clase)).length
@@ -89,8 +95,9 @@ function estadisticas(items) {
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
   const porDia = Array.from({ length: 14 }, (_, k) => {
     const d = new Date(hoy - (13 - k) * 864e5)
-    const valor = items.filter((i) => { const c = new Date(i.creado); c.setHours(0, 0, 0, 0); return +c === +d }).length
-    return { etiqueta: d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }).replace('.', ''), valor }
+    const delDia = items.filter((i) => { const c = new Date(i.creado); c.setHours(0, 0, 0, 0); return +c === +d })
+    const partes = Object.keys(ESTADO).map((k) => ({ nombre: ESTADO[k].nombre, color: ESTADO[k].color, valor: delDia.filter((i) => estadoDe(i) === k).length }))
+    return { etiqueta: d.toLocaleDateString('es-PE', { day: '2-digit', month: 'short' }).replace('.', ''), partes }
   })
   const cuenta = {}
   conc.filter((i) => !esSana(i.clase)).forEach((i) => { cuenta[i.clase] = (cuenta[i.clase] || 0) + 1 })

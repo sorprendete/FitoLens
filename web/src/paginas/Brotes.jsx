@@ -8,10 +8,10 @@ import { fechaHace } from '../datos/utiles'
 
 const PERIODOS = [[7, '7 días'], [30, '30 días'], [90, '90 días']]
 
-// Escala de color de bajo (azul) a alto (violeta → rosa → ámbar).
+// Intensidad: pocos casos = amarillo claro, muchos = rojo oscuro (datos/paleta.js).
 function color(v) {
   if (!v) return 'var(--mapa-vacio)'
-  return escala(0.08 + v * 0.92)
+  return escala(v)
 }
 
 export default function Brotes() {
@@ -81,7 +81,8 @@ export default function Brotes() {
               <text key={p.id} x={p.cx} y={p.cy} className="mapa-nombre">{p.nombre}</text>
             ))}
           </svg>
-          <div className="leyenda"><span>Menos casos</span><i /><span>Más casos</span></div>
+          <div className="leyenda"><span>Pocos casos</span><i /><span>Muchos casos</span></div>
+          <p className="tenue pequeno">El color indica cuántos casos con enfermedad hubo: amarillo claro = pocos, rojo oscuro = muchos. Gris = sin casos.</p>
         </div>
 
         <div className="columna">
@@ -94,7 +95,7 @@ export default function Brotes() {
               <h2>{activa.nombre}</h2>
               <p className="tenue">{activa.total} casos</p>
               {activa.clases.slice(0, 5).map(([c, n]) => (
-                <div key={c} className="fila"><span>{CULTIVOS[c.split('_')[0]]?.nombre} · {infoClase(c).nombre}</span><b>{n}</b></div>
+                <div key={c} className="fila"><span><i className="punto" style={{ background: CULTIVOS[c.split('_')[0]]?.color }} />{CULTIVOS[c.split('_')[0]]?.nombre} · {infoClase(c).nombre}</span><b>{n}</b></div>
               ))}
               {!activa.clases.length && <p className="tenue">Sin casos registrados.</p>}
             </div>

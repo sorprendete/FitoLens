@@ -8,7 +8,7 @@
   --fondo: #080c1a; --fondo-2: #0f1528; --sup: #121a30; --sup-2: #18213b; --borde: #222c48; --borde-2: #313d60;
   --texto: #eef2fb; --tenue: #95a0bd; --acento: #22d3ee; --acento-2: #a78bfa; --oro: #fbbf24; --coral: #fb7185; --rosa: #f472b6;
   --ok: #34d399; --aviso: #fbbf24; --mal: #fb7185; --sobre-acento: #0b1020; --mapa-vacio: #1a2340;
-  --sombra: 0 1px 0 #ffffff0a inset, 0 20px 50px -24px #000c; --brillo: 0 0 0 1px #22d3ee33, 0 12px 40px -10px #8b5cf688;
+  --sombra: 0 1px 0 #ffffff0a inset, 0 20px 50px -24px #000c; --brillo: 0 0 0 1px #22d3ee26, 0 8px 24px -12px #8b5cf670;
   --vidrio: color-mix(in srgb, var(--fondo) 80%, transparent);
   --aurora-1: #0891b255; --aurora-2: #7c3aed4d; --aurora-3: #db277733;
   color-scheme: dark;
@@ -17,7 +17,7 @@
   --fondo: #f5f6fb; --fondo-2: #eceff7; --sup: #ffffff; --sup-2: #f7f8fd; --borde: #e1e5f0; --borde-2: #cdd3e3;
   --texto: #111827; --tenue: #5f6b85; --acento: #0891b2; --acento-2: #7c3aed; --oro: #d97706; --coral: #e11d48; --rosa: #db2777;
   --ok: #059669; --aviso: #d97706; --mal: #e11d48; --sobre-acento: #fff; --mapa-vacio: #e3e7f2;
-  --sombra: 0 1px 2px #1118270d, 0 14px 34px -18px #11182733; --brillo: 0 0 0 1px #7c3aed22, 0 12px 30px -12px #7c3aed66;
+  --sombra: 0 1px 2px #1118270d, 0 14px 34px -18px #11182733; --brillo: 0 0 0 1px #7c3aed1a, 0 8px 20px -12px #7c3aed55;
   --aurora-1: #22d3ee40; --aurora-2: #a78bfa40; --aurora-3: #f472b62e;
   color-scheme: light;
 }
@@ -68,7 +68,7 @@ button, select, input { font: inherit; color: inherit; }
 .btn.grande { padding: 16px 26px; font-size: 1.05rem; border-radius: 16px; }
 .btn.chico { padding: 6px 12px; font-size: .85rem; }
 .btn.ancho { width: 100%; }
-.btn.brillo { box-shadow: 0 0 0 1px #a78bfa66, 0 12px 44px -6px #8b5cf6aa; }
+.btn.brillo { box-shadow: 0 0 0 1px #a78bfa44, 0 10px 28px -10px #8b5cf699; }
 .icono-btn { display: inline-grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: var(--radio-s); cursor: pointer;
   background: var(--sup); color: var(--texto); box-shadow: inset 0 0 0 1px var(--borde); transition: box-shadow .2s; }
 .icono-btn:hover { box-shadow: inset 0 0 0 1px var(--acento); }
@@ -76,7 +76,7 @@ button, select, input { font: inherit; color: inherit; }
 select, .entrada { min-height: 44px; border-radius: var(--radio-s); background: var(--sup); border: 1px solid var(--borde-2); }
 select { padding: 0 12px; cursor: pointer; }
 .entrada { display: flex; align-items: center; gap: 10px; padding: 0 12px; color: var(--tenue); transition: border-color .2s, box-shadow .2s; }
-.entrada:focus-within { border-color: var(--acento); box-shadow: 0 0 0 4px color-mix(in srgb, var(--acento) 18%, transparent); }
+.entrada:focus-within { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); }
 .entrada input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--texto); padding: 11px 0; }
 .campo { display: block; margin-bottom: 14px; } .campo > span { display: block; font-weight: 600; font-size: .88rem; margin-bottom: 6px; }
 .ojo { border: 0; background: none; color: var(--tenue); cursor: pointer; display: grid; padding: 4px; }
@@ -449,10 +449,10 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 
 /* Tonos extra para KPI e insignias */
 .kpi.tono-violeta { --t: var(--acento-2); } .kpi.tono-rosa { --t: var(--rosa); } .kpi.tono-oro { --t: var(--oro); }
-.kpi::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, var(--t), color-mix(in srgb, var(--t) 30%, var(--acento-2))); }
+.kpi::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--t); opacity: .85; }
 .kpi-icono { background: linear-gradient(135deg, color-mix(in srgb, var(--t) 28%, transparent), color-mix(in srgb, var(--t) 8%, transparent)); }
 .kpi, .modelo-mini, .flujo li, .ip-tarjeta, .guia li { transition: transform .25s cubic-bezier(.2, .8, .2, 1), box-shadow .25s, border-color .25s; }
-.kpi:hover, .flujo li:hover, .ip-tarjeta:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--t, var(--acento)) 45%, var(--borde)); box-shadow: 0 18px 40px -20px color-mix(in srgb, var(--t, var(--acento)) 60%, #000); }
+.kpi:hover, .flujo li:hover, .ip-tarjeta:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--t, var(--acento)) 45%, var(--borde)); box-shadow: 0 14px 30px -20px color-mix(in srgb, var(--t, var(--acento)) 50%, #000); }
 .modelo-mini:hover { transform: translateY(-3px); }
 .kpi-icono svg { transition: transform .4s; } .kpi:hover .kpi-icono svg { transform: rotate(-12deg) scale(1.15); }
 .rejilla-kpi > :nth-child(2) { animation-delay: .06s; } .rejilla-kpi > :nth-child(3) { animation-delay: .12s; } .rejilla-kpi > :nth-child(4) { animation-delay: .18s; }
@@ -465,9 +465,9 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 
 /* Menú lateral */
 .nav-item[aria-current] { background: linear-gradient(90deg, color-mix(in srgb, var(--acento) 16%, transparent), color-mix(in srgb, var(--acento-2) 10%, transparent) 70%, transparent); }
-.nav-item[aria-current]::before { background: linear-gradient(180deg, var(--acento), var(--acento-2)); box-shadow: 0 0 14px var(--acento-2); }
+.nav-item[aria-current]::before { width: 3px; background: linear-gradient(180deg, var(--acento), var(--acento-2)); box-shadow: 0 0 8px color-mix(in srgb, var(--acento-2) 60%, transparent); }
 .nav-item svg { transition: transform .25s; } .nav-item:hover svg { transform: translateX(2px) scale(1.08); }
-.logo img { box-shadow: 0 0 0 1px #a78bfa44, 0 8px 24px -8px #8b5cf6aa; }
+.logo img { box-shadow: 0 0 0 1px #a78bfa33, 0 6px 16px -8px #8b5cf699; }
 .logo em { background: linear-gradient(90deg, var(--acento), var(--acento-2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .avatar { background: linear-gradient(135deg, var(--acento), var(--acento-2) 60%, var(--rosa)); color: #0b1020; }
 .bienvenida { background: radial-gradient(500px 220px at 100% 0%, color-mix(in srgb, var(--acento-2) 24%, transparent), transparent),
@@ -479,23 +479,23 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 /* Gráficos */
 .col { position: relative; }
 .col i { background: linear-gradient(180deg, var(--c1, var(--acento-2)), var(--c2, var(--acento))); transition: filter .2s, transform .2s; }
-.col:hover i { transform: scaleY(1.03); filter: brightness(1.15) saturate(1.2); box-shadow: 0 0 22px color-mix(in srgb, var(--c1, var(--acento-2)) 55%, transparent); }
+.col:hover i { transform: scaleY(1.03); filter: brightness(1.15) saturate(1.2); box-shadow: 0 0 10px color-mix(in srgb, var(--c, var(--acento)) 40%, transparent); }
 .tip { position: absolute; bottom: calc(100% - 10px); left: 50%; transform: translate(-50%, 6px); padding: 6px 10px; border-radius: 10px; white-space: nowrap; pointer-events: none;
   font-size: .78rem; background: var(--texto); color: var(--fondo); box-shadow: 0 10px 30px #0006; opacity: 0; transition: opacity .15s, transform .15s; z-index: 3; }
 .tip b { font-weight: 800; }
 .col:hover .tip, .ranking li:hover .tip { opacity: 1; transform: translate(-50%, 0); }
 .ranking li { position: relative; padding: 4px 6px; margin: -4px -6px; border-radius: 10px; transition: background .2s; }
 .ranking li:hover { background: var(--fondo-2); }
-.rk-pista i { background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 45%, #fff)) !important; box-shadow: 0 0 12px color-mix(in srgb, var(--c) 40%, transparent); }
+.rk-pista i { background: var(--c) !important; box-shadow: 0 0 6px color-mix(in srgb, var(--c) 30%, transparent); }
 .rk-txt::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; background: var(--c); }
 .dona-arco { stroke-linecap: round; animation: dibujar 1.1s cubic-bezier(.2, .8, .2, 1) both; transition: stroke-width .2s; }
 .dona-arco:hover { stroke-width: 15; }
 @keyframes dibujar { from { stroke-dasharray: 0 999; } }
 .leyenda-lista li { padding: 4px 6px; margin: -4px -6px; border-radius: 8px; } .leyenda-lista li:hover { background: var(--fondo-2); }
-.leyenda-lista i { border-radius: 50%; box-shadow: 0 0 10px currentColor; }
+.leyenda-lista i { border-radius: 50%; box-shadow: 0 0 5px color-mix(in srgb, currentColor 60%, transparent); }
 .modelo-mini { border-left: 0; position: relative; overflow: hidden; background: linear-gradient(135deg, color-mix(in srgb, var(--c) 18%, var(--fondo-2)), var(--fondo-2) 70%); }
 .modelo-mini b { color: var(--c); }
-.barra-relleno { background: linear-gradient(90deg, var(--acento), var(--acento-2), var(--rosa)); background-size: 200% 100%; animation: llenar .9s ease, fluir 4s ease-in-out infinite alternate; }
+.barra-relleno { background: var(--ok); animation: llenar .9s ease; }
 
 /* Portada de acceso: partículas */
 .particulas { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
@@ -504,7 +504,7 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 .particulas i:nth-child(3n) { --p: #a78bfa; width: 4px; height: 4px; } .particulas i:nth-child(3n+1) { --p: #f472b6; } .particulas i:nth-child(4n) { --p: #fbbf24; width: 3px; height: 3px; }
 .heroe { background: radial-gradient(800px 560px at 15% 0%, #312e81, transparent 60%), radial-gradient(700px 520px at 100% 100%, #0e7490aa, transparent 60%),
   radial-gradient(500px 400px at 85% 15%, #9d174d66, transparent 60%), #070b1a; }
-.escaneo { box-shadow: 0 30px 80px -20px #000, 0 0 0 1px #a78bfa55, 0 0 60px -10px #8b5cf6aa; }
+.escaneo { box-shadow: 0 30px 80px -20px #000, 0 0 0 1px #a78bfa44, 0 0 36px -14px #8b5cf699; }
 .escaneo-linea { background: linear-gradient(180deg, transparent, #22d3ee44 80%, #a78bfa); }
 .escaneo-linea::after { background: #a78bfa; box-shadow: 0 0 18px 3px #22d3ee; }
 .escaneo-esquinas { filter: hue-rotate(0deg); }
@@ -512,12 +512,25 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 
 /* Mapa de brotes y estado */
 .tarjeta.kpi b { background: linear-gradient(90deg, var(--oro), var(--rosa)); -webkit-background-clip: text; background-clip: text; color: transparent; }
-.leyenda i { background: linear-gradient(90deg, #3b82f6, #8b5cf6, #ec4899, #f59e0b); }
+.leyenda i { background: linear-gradient(90deg, #fde68a, #fb923c, #ef4444, #991b1b); }
 .cifra-grande b { background-image: linear-gradient(120deg, var(--acento), var(--acento-2), var(--rosa)); }
 .chip-demo { animation: respirar 3s ease-in-out infinite; } @keyframes respirar { 50% { opacity: .65; } }
-.pt.mal { box-shadow: 0 0 14px var(--mal); }
+.pt.mal { box-shadow: 0 0 8px var(--mal); }
 .resumen-umbral b { background: linear-gradient(90deg, var(--oro), var(--rosa)); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .pulso { background: radial-gradient(var(--acento-2), var(--acento)); }
 
 @media (prefers-reduced-motion: reduce) { body::after, .particulas { display: none; } }
 [data-tema='claro'] .modelo-mini b, [data-tema='claro'] .rk-txt { color: color-mix(in srgb, var(--c) 72%, #000); } [data-tema='claro'] .rk-txt { color: var(--texto); }
+
+/* ---------- 17. Colores con significado ----------
+   Estado: sana = verde, enfermedad = rojo, no concluyente = ámbar, rechazada = gris.
+   Cultivo: color fijo definido en datos/clases.js. Intensidad (mapa): amarillo claro → rojo oscuro. */
+.col { justify-content: flex-end; }
+.pila { width: 100%; max-width: 38px; display: flex; flex-direction: column-reverse; border-radius: 8px 8px 3px 3px; overflow: hidden; animation: crecer .7s ease both; transform-origin: bottom; }
+.pila span { display: block; width: 100%; background: var(--c); min-height: 0; }
+.pila span + span { box-shadow: 0 1px 0 var(--sup); }
+.col:hover .pila { filter: brightness(1.12); }
+.leyenda-fila { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 12px; font-size: .82rem; color: var(--tenue); }
+.leyenda-fila span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda-fila i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.tip { line-height: 1.5; text-align: left; } .tip i { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; background: var(--c); }

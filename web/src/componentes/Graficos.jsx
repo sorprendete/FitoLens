@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { PALETA, escala } from '../datos/paleta'
 
 // Gráficos en SVG/CSS propios: livianos, accesibles, multicolor y con los colores del tema.
 
@@ -26,24 +25,37 @@ export function Contador({ valor, ms = 900 }) {
   return `${(v ?? 0).toLocaleString('es-PE', { minimumFractionDigits: dec, maximumFractionDigits: dec })}${m[2]}`
 }
 
-// Columnas verticales (p. ej. análisis por día), con degradado que recorre la paleta.
+// Columnas apiladas (p. ej. diagnósticos por día). datos: [{ etiqueta, partes: [{ nombre, valor, color }] }]
+// Cada color es una categoría con significado y se explica en la leyenda de abajo.
 export function Columnas({ datos, alto = 190 }) {
-  const max = Math.max(1, ...datos.map((d) => d.valor))
+  const total = (d) => d.partes.reduce((a, p) => a + p.valor, 0)
+  const max = Math.max(1, ...datos.map(total))
+  const series = datos[0]?.partes ?? []
   return (
-    <div className="columnas" style={{ height: alto }} role="img" aria-label="Gráfico de columnas">
-      {datos.map((d, i) => {
-        const t = datos.length > 1 ? i / (datos.length - 1) : 0
-        return (
-          <div key={i} className="col" style={{ '--c1': escala(t, ['#a78bfa', '#f472b6', '#fbbf24']), '--c2': escala(t, ['#22d3ee', '#8b5cf6', '#ec4899']) }}>
-            <span className="tip"><b>{d.valor}</b> · {d.etiqueta}</span>
-            <span className="col-valor">{d.valor || ''}</span>
-            <i style={{ height: `${(d.valor / max) * 100}%`, animationDelay: `${i * 35}ms` }} />
-            <small>{d.etiqueta}</small>
-          </div>
-        )
-      })}
-    </div>
+    <>
+      <div className="columnas" style={{ height: alto }} role="img" aria-label="Gráfico de columnas apiladas">
+        {datos.map((d, i) => {
+          const n = total(d)
+          return (
+            <div key={i} className="col">
+              <span className="tip"><b>{d.etiqueta}: {n}</b>{d.partes.filter((p) => p.valor).map((p) => <span key={p.nombre} style={{ '--c': p.color }}><br /><i />{p.nombre}: {p.valor}</span>)}</span>
+              <span className="col-valor">{n || ''}</span>
+              <div className="pila" style={{ height: `${(n / max) * 100}%`, animationDelay: `${i * 35}ms` }}>
+                {d.partes.map((p) => <span key={p.nombre} style={{ height: `${n ? (p.valor / n) * 100 : 0}%`, '--c': p.color }} />)}
+              </div>
+              <small>{d.etiqueta}</small>
+            </div>
+          )
+        })}
+      </div>
+      <Leyenda items={series} />
+    </>
   )
+}
+
+// Leyenda horizontal: [{ nombre, color }]
+export function Leyenda({ items }) {
+  return <div className="leyenda-fila">{items.map((x) => <span key={x.nombre} style={{ '--c': x.color }}><i />{x.nombre}</span>)}</div>
 }
 
 // Barras horizontales con ranking. datos: [{ etiqueta, valor, color? }]
@@ -52,7 +64,7 @@ export function Ranking({ datos, total }) {
   return (
     <ul className="ranking">
       {datos.map((d, i) => (
-        <li key={d.etiqueta} style={{ '--c': d.color || PALETA[i % PALETA.length] }}>
+        <li key={d.etiqueta} style={{ '--c': d.color || 'var(--acento)' }}>
           <span className="rk-txt">{d.etiqueta}</span>
           <span className="rk-pista"><i style={{ width: `${(d.valor / max) * 100}%`, animationDelay: `${i * 80}ms` }} /></span>
           <b>{d.valor}{total ? <small> · {Math.round((d.valor / total) * 100)} %</small> : null}</b>
@@ -74,7 +86,7 @@ export function Dona({ datos, centro, sub }) {
         {datos.map((d, i) => {
           const largo = Math.max(0, (d.valor / total) * C - hueco)
           const el = (
-            <circle key={d.etiqueta} cx="50" cy="50" r={r} stroke={d.color || PALETA[i % PALETA.length]} strokeDasharray={`${largo} ${C - largo}`}
+            <circle key={d.etiqueta} cx="50" cy="50" r={r} stroke={d.color} strokeDasharray={`${largo} ${C - largo}`}
               strokeDashoffset={-acum} className="dona-arco" style={{ animationDelay: `${i * 120}ms` }}>
               <title>{`${d.etiqueta}: ${d.valor} (${Math.round((d.valor / total) * 100)} %)`}</title>
             </circle>
@@ -87,7 +99,7 @@ export function Dona({ datos, centro, sub }) {
       </svg>
       <ul className="leyenda-lista">
         {datos.map((d, i) => {
-          const c = d.color || PALETA[i % PALETA.length]
+          const c = d.color
           return <li key={d.etiqueta}><i style={{ background: c, color: c }} />{d.etiqueta}<b>{d.valor}<small className="tenue"> · {Math.round((d.valor / total) * 100)} %</small></b></li>
         })}
       </ul>
