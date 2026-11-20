@@ -11,6 +11,7 @@ import { Analizando, GuiaFoto, TarjetaResultado } from './src/Resultado'
 import { enLinea, enviar } from './src/servidor'
 import { Fila, borrar, guardar, listar, pendientes, sincronizar, sincronizarSola } from './src/historial'
 import Cuenta from './src/Cuenta'
+import AvisoActualizacion from './src/AvisoActualizacion'
 import { cargarCuenta, cuentaActual, provinciaActual } from './src/cuenta'
 
 type Vista = 'diagnosticar' | 'historial' | 'parcelas' | 'cuenta'
@@ -27,6 +28,7 @@ export default function App() {
         <Text style={s.marca}>Fito<Text style={{ color: C.acento }}>Lens</Text></Text>
         <Text style={s.chip}>{hayIaLocal() ? '● IA en el teléfono' : '● IA en el servidor'}</Text>
       </View>
+      <AvisoActualizacion />
       {vista === 'diagnosticar' ? <Diagnosticar /> : vista === 'historial' ? <Historial /> : vista === 'parcelas' ? <Parcelas /> : <Cuenta />}
       <View style={s.pestanas}>
         {(Object.keys(PESTANAS) as Vista[]).map((v) => (

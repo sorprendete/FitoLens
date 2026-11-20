@@ -2,7 +2,7 @@
   "cli": { "version": ">= 16.0.0", "appVersionSource": "remote" },
   "build": {
     "desarrollo": { "developmentClient": true, "distribution": "internal", "android": { "buildType": "apk" } },
-    "apk": { "distribution": "internal", "android": { "buildType": "apk" } },
+    "apk": { "distribution": "internal", "autoIncrement": true, "android": { "buildType": "apk" } },
     "ios-prueba": { "distribution": "internal", "ios": { "simulator": false } },
     "tiendas": { "autoIncrement": true }
   },

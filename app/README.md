@@ -69,8 +69,21 @@ eas build -p android --profile desarrollo   # instala el APK y luego:  npx expo 
 ## Generar el APK (Android)
 
 ```bash
-eas build -p android --profile apk
+# Desde la carpeta app/. EAS_NO_VCS hace que use .easignore (que sí incluye los modelos .onnx).
+# En Windows (PowerShell):  $env:EAS_NO_VCS=1; $env:EAS_PROJECT_ROOT="."; npx eas-cli build -p android --profile apk
+EAS_NO_VCS=1 EAS_PROJECT_ROOT=. npx eas-cli build -p android --profile apk
 ```
+
+Para que se descargue desde la web (sección "App móvil"): copia el `.apk` al VPS y publícalo con
+`bash scripts/publicar_apk.sh FitoLens.apk 2.0.1 "Qué cambió"` dentro de `despliegue/` (queda en `https://<sitio>/descargas/FitoLens.apk`).
+
+## Actualizaciones (aviso "Actualizar")
+
+Con internet, la app revisa `/descargas/app.json` al abrirse (máximo una vez por hora). Si esa versión es mayor que la suya,
+muestra una franja "Nueva versión X · Actualizar": descarga el APK y abre el instalador de Android. El historial y la cuenta se conservan.
+
+Para sacar una versión nueva: 1) sube `version` en `app.json` (2.0.0 → 2.0.1), 2) compila con EAS (perfil `apk`, el número interno sube solo),
+3) publícalo con `publicar_apk.sh`. Siempre con la misma cuenta de Expo: Android solo actualiza si el APK lleva la misma firma.
 
 Al terminar, EAS da un enlace y un QR para descargar el `.apk` e instalarlo en cualquier Android (sirve para el stand de la Expoferia).
 
