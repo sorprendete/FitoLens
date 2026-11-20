@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "FitoLens",
+    "slug": "fitolens",
+    "scheme": "fitolens",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#080c1a",
+    "splash": { "backgroundColor": "#080c1a" },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "pe.edu.unsm.fitolens",
+      "infoPlist": {
+        "NSCameraUsageDescription": "FitoLens usa la cámara para fotografiar hojas y mazorcas y diagnosticarlas.",
+        "NSPhotoLibraryUsageDescription": "FitoLens abre tu galería para diagnosticar fotos que ya tomaste.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "pe.edu.unsm.fitolens",
+      "adaptiveIcon": {
+        "backgroundColor": "#080c1a",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["CAMERA"],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "onnxruntime-react-native",
+      "expo-sqlite",
+      ["expo-image-picker", { "cameraPermission": "FitoLens usa la cámara para fotografiar hojas y mazorcas y diagnosticarlas." }],
+      ["expo-build-properties", { "android": { "minSdkVersion": 24 }, "ios": { "deploymentTarget": "16.4" } }]
+    ],
+    "extra": { "api": "https://fitolens.5-253-232-122.sslip.io" }
+  }
+}

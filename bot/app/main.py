@@ -7,12 +7,13 @@ from telegram.constants import ChatAction, ParseMode
 from telegram.ext import (Application, CallbackQueryHandler, CommandHandler, ContextTypes,
                           MessageHandler, filters)
 
-from app import textos
+from app import alertas, textos
 from app.cliente_api import ClienteApi, ErrorApi
 from app.config import ajustes
 
 log = logging.getLogger("fitolens.bot")
 MAX_BYTES = 8 * 1024 * 1024  # igual que MAX_IMAGEN_MB de la API
+MAX_FOTOS_GUARDADAS = 3  # por agricultor, en memoria, solo para pedir el reporte PDF
 
 
 async def inicio(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -50,7 +51,7 @@ async def foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ErrorApi as e:
         await espera.edit_text(f"😕 {e}")
         return
-    await espera.edit_text(textos.resultado(r), parse_mode=ParseMode.HTML)
+    await espera.edit_text(textos.resultado(r), parse_mode=ParseMode.HTML, reply_markup=boton_reporte(r, datos, context))
     await enviar_mapa(msj, r)
     if provincia is None and not context.user_data.get("ya_pregunte"):
         context.user_data["ya_pregunte"] = True
@@ -61,6 +62,34 @@ async def enviar_mapa(msj: Message, r: dict) -> None:
     png = r.get("mapa_calor_png_base64")
     if r.get("estado") == "diagnostico" and png and not (r.get("clase") or "").endswith("_sana"):
         await msj.reply_photo(base64.b64decode(png), caption=textos.CAPTION_MAPA)
+
+
+def boton_reporte(r: dict, datos: bytes, context: ContextTypes.DEFAULT_TYPE) -> InlineKeyboardMarkup | None:
+    """Botón para pedir el PDF. Se guardan las últimas fotos: la API pide la misma foto para el reporte."""
+    if r.get("estado") != "diagnostico" or "id" not in r:
+        return None
+    fotos = context.user_data.setdefault("fotos", {})
+    fotos[r["id"]] = datos
+    for viejo in list(fotos)[:-MAX_FOTOS_GUARDADAS]:
+        del fotos[viejo]
+    return InlineKeyboardMarkup([[InlineKeyboardButton(textos.BOTON_REPORTE, callback_data=f"pdf:{r['id']}")]])
+
+
+async def enviar_reporte(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    consulta = update.callback_query
+    id_ = int(consulta.data.removeprefix("pdf:"))
+    datos = context.user_data.get("fotos", {}).get(id_)
+    if datos is None:
+        await consulta.answer(textos.REPORTE_VENCIDO, show_alert=True)
+        return
+    await consulta.answer(textos.GENERANDO_REPORTE)
+    await context.bot.send_chat_action(consulta.message.chat_id, ChatAction.UPLOAD_DOCUMENT)
+    try:
+        pdf = await context.bot_data["api"].reporte(id_, datos, update.effective_user.id)
+    except ErrorApi as e:
+        await consulta.message.reply_text(f"😕 {e}")
+        return
+    await consulta.message.reply_document(pdf, filename=f"fitolens-reporte-{id_}.pdf", caption=textos.CAPTION_REPORTE)
 
 
 async def otro(update: Update, _: ContextTypes.DEFAULT_TYPE) -> None:
@@ -91,9 +120,11 @@ def crear_app() -> Application:
     app.add_handler(CommandHandler(["start", "ayuda", "help"], inicio))
     app.add_handler(CommandHandler("provincia", pedir_provincia))
     app.add_handler(CallbackQueryHandler(elegir_provincia, pattern=r"^prov:"))
+    app.add_handler(CallbackQueryHandler(enviar_reporte, pattern=r"^pdf:\d+$"))
     app.add_handler(MessageHandler(filters.PHOTO | filters.Document.ALL, foto))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, otro))
     app.add_error_handler(error)
+    alertas.registrar(app)
     return app
 
 

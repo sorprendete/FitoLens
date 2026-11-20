@@ -10,8 +10,12 @@ log = logging.getLogger("fitolens.auditoria")
 
 
 def ip_cliente(request: Request) -> str:
-    # Caddy pone la IP real del cliente en X-Forwarded-For. Se toma la última entrada:
-    # las anteriores las puede escribir el propio cliente para falsificarla.
+    # Caddy escribe X-Real-IP con la IP real del visitante (también detrás del nginx del VPS)
+    # y pisa cualquier valor que mande el cliente, así que no se puede falsificar.
+    real = request.headers.get("x-real-ip", "").strip()
+    if real:
+        return real[:64]
+    # Sin Caddy delante (bot, pruebas): última entrada de X-Forwarded-For.
     xff = request.headers.get("x-forwarded-for", "")
     if xff:
         return xff.split(",")[-1].strip()[:64]

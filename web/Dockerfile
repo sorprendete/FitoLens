@@ -5,6 +5,9 @@ WORKDIR /web
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
+# false = si la API falla se muestra el error (nunca datos simulados). Lo pasa docker-compose.yml.
+ARG VITE_MODO_DEMO=false
+ENV VITE_MODO_DEMO=$VITE_MODO_DEMO
 RUN npm run build
 
 FROM nginx:1.27-alpine

@@ -22,6 +22,7 @@ class Ajustes(BaseSettings):
     # Modelos de IA
     modelos_dir: Path = Path("/modelos")
     ort_hilos: int = 2  # hilos de ONNX Runtime por modelo
+    modelos_version: str = ""  # Release de GitHub instalado (MODELOS_VERSION en .env), solo informativo
 
     # Imágenes
     max_imagen_mb: float = 8.0
@@ -35,6 +36,10 @@ class Ajustes(BaseSettings):
     login_max_fallos_ip: int = 20  # más alto: en la feria muchos comparten el mismo wifi (misma IP)
     login_bloqueo_minutos: int = 15
     cors_origenes: str = ""  # lista separada por comas; vacío = mismo dominio
+
+    # Alertas de brote: N casos de la misma enfermedad en la misma provincia dentro de la ventana
+    alerta_umbral_casos: int = 3
+    alerta_ventana_dias: int = 7
 
     log_nivel: str = "INFO"
 

@@ -29,6 +29,18 @@ class ClienteApi:
             raise ErrorApi(_detalle(r) or "No pude leer esa foto. Envía otra, por favor.")
         raise ErrorApi("FitoLens no está disponible ahora mismo. Inténtalo otra vez en unos minutos.")
 
+    async def reporte(self, diagnostico_id: int, foto: bytes, usuario_id: int) -> bytes:
+        """PDF del diagnóstico. La API exige la misma foto que se diagnosticó."""
+        cabeceras = {"X-Forwarded-For": f"telegram-{usuario_id}"}
+        try:
+            r = await self._http.post(f"/api/reporte/{diagnostico_id}", headers=cabeceras,
+                                      files={"imagen": ("foto.jpg", foto, "image/jpeg")})
+        except httpx.HTTPError as e:
+            raise ErrorApi("No pude generar el reporte. Inténtalo otra vez en un momento.") from e
+        if r.status_code == 200:
+            return r.content
+        raise ErrorApi(_detalle(r) or "No pude generar el reporte. Inténtalo otra vez en un momento.")
+
     async def cerrar(self) -> None:
         await self._http.aclose()
 

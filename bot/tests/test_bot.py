@@ -113,4 +113,25 @@ async def test_flujo_foto_completo():
 def test_app_registra_manejadores(monkeypatch):
     monkeypatch.setenv("TELEGRAM_TOKEN", "123:ABC")
     main.ajustes.cache_clear()
-    assert len(main.crear_app().handlers[0]) == 5
+    assert len(main.crear_app().handlers[0]) == 6
+
+
+# ---------- reporte PDF ----------
+async def test_reporte_pdf_por_boton():
+    context = SimpleNamespace(bot=SimpleNamespace(send_chat_action=AsyncMock()), user_data={},
+                              bot_data={"api": MagicMock(reporte=AsyncMock(return_value=b"%PDF"))})
+    teclado = main.boton_reporte({**DIAG, "id": 5}, b"JPEG", context)
+    assert teclado.inline_keyboard[0][0].callback_data == "pdf:5"
+
+    mensaje = SimpleNamespace(chat_id=1, reply_document=AsyncMock(), reply_text=AsyncMock())
+    consulta = SimpleNamespace(data="pdf:5", answer=AsyncMock(), message=mensaje)
+    update = SimpleNamespace(callback_query=consulta, effective_user=SimpleNamespace(id=7))
+    await main.enviar_reporte(update, context)
+
+    context.bot_data["api"].reporte.assert_awaited_once_with(5, b"JPEG", 7)
+    mensaje.reply_document.assert_awaited_once()
+
+
+def test_sin_boton_si_no_es_diagnostico():
+    context = SimpleNamespace(user_data={})
+    assert main.boton_reporte({"estado": "rechazada", "id": 3}, b"x", context) is None

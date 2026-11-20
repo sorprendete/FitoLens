@@ -5,7 +5,10 @@
 		max_size 15MB
 	}
 	handle /api/* {
-		reverse_proxy api:8000
+		reverse_proxy api:8000 {
+			# IP real del visitante para límites, bloqueo de login y auditoría.
+			header_up X-Real-IP {client_ip}
+		}
 	}
 	handle {
 		reverse_proxy web:80

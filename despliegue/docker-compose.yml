@@ -24,7 +24,10 @@ services:
   web:
     <<: *comun
     image: ${REGISTRO:-ghcr.io/sorprendete}/fitolens-web:${VERSION:-latest}
-    build: ../web                  # sirve el React compilado en el puerto 80 interno
+    build:                         # sirve el React compilado en el puerto 80 interno
+      context: ../web
+      args:
+        VITE_MODO_DEMO: ${VITE_MODO_DEMO:-false}   # Plan B offline: true o vacío
 
   api:
     <<: *comun

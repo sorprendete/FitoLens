@@ -1,0 +1,21 @@
+/* Seguimiento de parcelas */
+.parcela-tarjeta { display: flex; flex-direction: column; gap: 6px; text-align: left; cursor: pointer; font: inherit; color: inherit; min-height: 150px; }
+.parcela-tarjeta:hover { border-color: var(--acento); }
+.parcela-tarjeta h3 { margin: 4px 0 0; }
+.parcela-pie { margin-top: auto; display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-top: 10px; }
+.parcela-estado { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+.severidad { display: inline-flex; align-items: center; gap: 7px; font-weight: 700; font-size: .88rem; }
+.severidad i { width: 11px; height: 11px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px color-mix(in srgb, var(--c) 60%, transparent); }
+.severidad.grande { font-size: 1.25rem; font-family: var(--titulos); } .severidad.grande i { width: 15px; height: 15px; }
+.severidad-opciones { border: 0; padding: 0; display: grid; gap: 6px; }
+.severidad-opciones label { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 4px 10px; padding: 9px 12px; border-radius: var(--radio-s); border: 1px solid var(--borde); cursor: pointer; }
+.severidad-opciones label[aria-checked='true'] { border-color: var(--c); background: color-mix(in srgb, var(--c) 10%, transparent); }
+.severidad-opciones input { position: absolute; opacity: 0; pointer-events: none; }
+.severidad-opciones i { width: 12px; height: 12px; border-radius: 50%; background: var(--c); }
+.severidad-opciones small { text-align: right; }
+.linea-sev { width: 100%; height: auto; display: block; margin-bottom: 8px; }
+.ls-guia { stroke: var(--borde); stroke-width: 1; }
+.ls-eje { fill: var(--tenue); font-size: 11px; }
+.ls-trat { stroke: var(--acento-2); stroke-width: 1.5; stroke-dasharray: 4 4; }
+.ls-trazo { fill: none; stroke: var(--tenue); stroke-width: 2; stroke-linejoin: round; }
+.ls-punto { stroke: var(--sup); stroke-width: 2.5; }

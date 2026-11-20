@@ -25,6 +25,7 @@ Flujo de `POST /api/diagnostico`: foto validada → **router** (¿qué cultivo?;
 | Método | Ruta | Auth |
 |---|---|---|
 | POST | `/api/diagnostico` (multipart: `imagen`, opcionales `provincia`, `latitud`, `longitud`, `origen`) | opcional (con token queda en el historial) |
+| POST | `/api/reporte/{id}` (multipart: `imagen`, la misma foto del diagnóstico) → PDF A4 con foto, cultivo, enfermedad, confianza, tratamiento, fecha y ubicación | no |
 | GET | `/api/metricas` | no |
 | GET | `/api/brotes?desde=YYYY-MM-DD` | no |
 | POST | `/api/auth/login` · `/api/auth/registro` · GET `/api/auth/yo` | — |

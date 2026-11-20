@@ -18,7 +18,7 @@ BIENVENIDA = (
     "• Una sola hoja, de cerca, que llene la foto.\n"
     "• Con luz de día, sin sombra fuerte ni flash.\n"
     "• Que se vea nítida, sin moverse.\n\n"
-    "Comandos: /provincia para elegir tu provincia · /ayuda"
+    "Comandos: /provincia para elegir tu provincia · /alertas para recibir avisos de brotes · /ayuda"
 )
 ANALIZANDO = "🔎 Analizando tu foto…"
 SOLO_FOTOS = "Envíame una <b>foto</b> de la hoja enferma 📸. Si necesitas ayuda escribe /ayuda."
@@ -64,3 +64,10 @@ def resultado(r: dict) -> str:
 
 def porcentaje(valor: float | None) -> str:
     return "—" if valor is None else f"{round(valor * 100)} %"
+
+
+# Reporte PDF
+BOTON_REPORTE = "📄 Recibir reporte PDF"
+GENERANDO_REPORTE = "Preparando tu reporte…"
+REPORTE_VENCIDO = "Ese reporte ya no está disponible. Envía la foto otra vez."
+CAPTION_REPORTE = "📄 Tu reporte FitoLens. Puedes imprimirlo o mostrarlo en la agencia agraria."

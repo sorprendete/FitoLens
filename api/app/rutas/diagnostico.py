@@ -2,6 +2,7 @@ import logging
 import time
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from sqlalchemy.orm import Session
 
 from app.core.config import ajustes
@@ -42,7 +43,8 @@ async def crear(
 
     inicio = time.perf_counter()
     foto, datos, sha = await lector.leer(imagen)
-    r = diagnosticar(registro, foto)
+    # ONNX usa CPU varios cientos de ms: en un hilo aparte para no frenar las demás peticiones.
+    r = await run_in_threadpool(diagnosticar, registro, foto)
     duracion = round((time.perf_counter() - inicio) * 1000)
 
     fila = Diagnostico(
@@ -51,16 +53,22 @@ async def crear(
         provincia=provincia, latitud=latitud, longitud=longitud,
         modelo_version=r.modelo_version, imagen_sha256=sha, duracion_ms=duracion,
     )
-    sesion.add(fila)
-    sesion.flush()
     detalle = f"{r.estado}: {r.clase or r.motivo or ''} ({r.confianza or 0:.2f})"
-    auditoria.registrar(sesion, request, "diagnostico", "fallo" if r.estado == "rechazada" else "exito",
-                        usuario_id=fila.usuario_id, email=usuario.email if usuario else None, detalle=detalle)
+    await run_in_threadpool(_registrar, sesion, request, fila, r.estado, usuario, detalle)
     if a.guardar_imagenes:
-        _guardar(datos, sha, r.cultivo or r.estado)
+        await run_in_threadpool(_guardar, datos, sha, r.cultivo or r.estado)
     log.info("diagnostico id=%s estado=%s clase=%s conf=%s ms=%s",
              fila.id, r.estado, r.clase, r.confianza, duracion)
     return DiagnosticoSalida(id=fila.id, duracion_ms=duracion, **r.__dict__)
+
+
+def _registrar(sesion: Session, request: Request, fila: Diagnostico, estado: str,
+               usuario: Usuario | None, detalle: str) -> None:
+    """Guarda el diagnóstico y su evento de auditoría (escritura síncrona en la base de datos)."""
+    sesion.add(fila)
+    sesion.flush()
+    auditoria.registrar(sesion, request, "diagnostico", "fallo" if estado == "rechazada" else "exito",
+                        usuario_id=fila.usuario_id, email=usuario.email if usuario else None, detalle=detalle)
 
 
 def _guardar(datos: bytes, sha: str, carpeta: str) -> None:

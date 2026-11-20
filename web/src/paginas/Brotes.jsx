@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { obtenerBrotes } from '../api/cliente'
+import { alertas as apiAlertas, obtenerBrotes } from '../api/cliente'
+import AlertasBrote from '../componentes/AlertasBrote'
 import { REFRESCO_BROTES } from '../config'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
 import { PROVINCIAS, VIEWBOX } from '../datos/provincias'
@@ -20,11 +21,15 @@ export default function Brotes() {
   const [datos, setDatos] = useState(null)
   const [sel, setSel] = useState(null)
   const [error, setError] = useState('')
+  const [alertas, setAlertas] = useState(null)
 
   useEffect(() => {
     let vivo = true
-    const cargar = () => obtenerBrotes(fechaHace(dias)).then((d) => vivo && (setDatos(d), setError('')))
-      .catch((e) => vivo && setError(e.message))
+    const cargar = () => {
+      obtenerBrotes(fechaHace(dias)).then((d) => vivo && (setDatos(d), setError('')))
+        .catch((e) => vivo && setError(e.message))
+      apiAlertas.activas().then((a) => vivo && setAlertas(a)).catch(() => {})
+    }
     cargar()
     const t = setInterval(cargar, REFRESCO_BROTES)
     return () => { vivo = false; clearInterval(t) }
@@ -40,6 +45,7 @@ export default function Brotes() {
     return m
   }, [datos, cultivo])
 
+  const enAlerta = new Set((alertas?.alertas ?? []).map((a) => a.provincia))
   const max = Math.max(1, ...Object.values(conteo).map((c) => c.total))
   const ranking = PROVINCIAS.map((p) => ({ ...p, ...(conteo[p.id] ?? { total: 0, clases: [] }) })).sort((a, b) => b.total - a.total)
   const total = ranking.reduce((a, p) => a + p.total, 0)
@@ -64,6 +70,7 @@ export default function Brotes() {
         </div>
       </header>
       {error && <p className="alerta mal">{error}</p>}
+      <AlertasBrote datos={alertas} alElegir={setSel} />
 
       <div className="brotes-grid">
         <div className="tarjeta mapa">
@@ -71,9 +78,9 @@ export default function Brotes() {
             {PROVINCIAS.map((p) => {
               const n = conteo[p.id]?.total ?? 0
               return (
-                <path key={p.id} d={p.d} fill={color(n / max)} className={activa?.id === p.id ? 'activa' : ''}
+                <path key={p.id} d={p.d} fill={color(n / max)} className={`${activa?.id === p.id ? 'activa' : ''} ${enAlerta.has(p.id) ? 'en-alerta' : ''}`}
                   tabIndex="0" onMouseEnter={() => setSel(p.id)} onFocus={() => setSel(p.id)} onClick={() => setSel(p.id)}>
-                  <title>{`${p.nombre}: ${n} casos`}</title>
+                  <title>{`${p.nombre}: ${n} casos${enAlerta.has(p.id) ? ' · alerta de brote' : ''}`}</title>
                 </path>
               )
             })}
@@ -82,7 +89,7 @@ export default function Brotes() {
             ))}
           </svg>
           <div className="leyenda"><span>Pocos casos</span><i /><span>Muchos casos</span></div>
-          <p className="tenue pequeno">El color indica cuántos casos con enfermedad hubo: amarillo claro = pocos, rojo oscuro = muchos. Gris = sin casos.</p>
+          <p className="tenue pequeno">El color indica cuántos casos con enfermedad hubo: amarillo claro = pocos, rojo oscuro = muchos. Gris = sin casos.{enAlerta.size > 0 && ' Borde rojo que parpadea = alerta de brote.'}</p>
         </div>
 
         <div className="columna">

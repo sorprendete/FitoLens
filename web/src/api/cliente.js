@@ -73,6 +73,13 @@ export function diagnosticar(imagen, provincia) {
   }, () => mocks.diagnostico(imagen, provincia))
 }
 export const obtenerBrotes = (desde) => publico(() => pedir(`/brotes?desde=${desde}`), () => mocks.brotes(desde))
+// Versión de los modelos activos, desde /api/salud. Devuelve un texto como "café v1.2 · cacao v1.0".
+export async function versionModelos() {
+  const s = await publico(() => pedir('/salud'), async () => ({ modelo_version: 'demo' }))
+  if (s.version_modelo || s.modelo_version) return s.version_modelo || s.modelo_version
+  return Object.entries(s.modelos ?? {}).map(([n, v]) => `${n} v${String(v).replace(/^v/, '')}`).join(' · ')
+}
+
 export const obtenerMetricas = () => publico(() => pedir('/metricas'), mocks.metricas)
 
 // --- Cuenta ---
@@ -93,4 +100,40 @@ export const admin = {
     return privado(() => pedir(`/admin/auditoria?${p}`), () => mocks.auditoria(q))
   },
   amenazas: (dias, simulado) => privado(() => pedir(`/admin/amenazas?dias=${dias}&simulado=${simulado}`), () => mocks.amenazas(dias)),
+}
+
+// --- Parcelas (seguimiento del tratamiento; requiere cuenta) ---
+import * as mp from './mocksParcelas'
+export const parcelas = {
+  listar: () => privado(() => pedir('/parcelas'), mp.listar),
+  detalle: (id) => privado(() => pedir(`/parcelas/${id}`), () => mp.detalle(id)),
+  crear: (d) => privado(() => pedir('/parcelas', { metodo: 'POST', json: d }), () => mp.crear(d)),
+  borrar: (id) => privado(() => pedir(`/parcelas/${id}`, { metodo: 'DELETE' }), () => mp.borrar(id)),
+  visita: (id, d) => privado(() => pedir(`/parcelas/${id}/visitas`, { metodo: 'POST', json: d }), () => mp.visita(id, d)),
+  borrarVisita: (id, vid) => privado(() => pedir(`/parcelas/${id}/visitas/${vid}`, { metodo: 'DELETE' }), () => mp.borrarVisita(id, vid)),
+}
+
+// --- Reporte semanal para autoridades (rol admin) ---
+export const reporteSemanal = (semanas, hasta) =>
+  privado(() => pedir(`/reportes/semanal?semanas=${semanas}${hasta ? `&hasta=${hasta}` : ''}`), () => Promise.reject(new Error('El reporte necesita la API real.')))
+
+// Descarga un archivo protegido por token (fetch + blob) y lo guarda con su nombre del servidor.
+export async function descargar(ruta, nombre) {
+  const r = await fetch(API_URL + ruta, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  if (!r.ok) throw new Error(MENSAJES[r.status] || `Error ${r.status}`)
+  const n = r.headers.get('Content-Disposition')?.match(/filename="([^"]+)"/)?.[1] || nombre
+  const url = URL.createObjectURL(await r.blob())
+  Object.assign(document.createElement('a'), { href: url, download: n }).click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// --- Alertas de brote (públicas en el mapa; los suscriptores de Telegram, solo admin) ---
+const alertasDemo = async () => ({ umbral: 3, ventana_dias: 7, alertas: [
+  { id: 1, provincia: 'moyobamba', cultivo: 'cafe', clase: 'cafe_roya', casos: 6, ventana_dias: 7, avisados: 2, creado: new Date(Date.now() - 2 * 864e5).toISOString(), actualizada: new Date().toISOString() },
+] })
+export const alertas = {
+  activas: () => publico(() => pedir('/alertas'), alertasDemo),
+  suscripciones: () => privado(() => pedir('/alertas/suscripciones'), async () => []),
+  suscribir: (d) => privado(() => pedir('/alertas/suscripciones', { metodo: 'POST', json: d }), async () => ({ id: Date.now(), ...d, provincia_nombre: d.provincia || 'Todas', creado: new Date().toISOString() })),
+  borrar: (id) => privado(() => pedir(`/alertas/suscripciones/${id}`, { metodo: 'DELETE' }), async () => null),
 }
