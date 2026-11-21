@@ -9,13 +9,26 @@ from dataclasses import dataclass, field
 import numpy as np
 from PIL import Image
 
+from app.core.config import ajustes
 from app.ia import mapa_calor
 from app.ia.modelo import promedio, softmax
 from app.ia.registro import Registro
 from app.ia.segmentacion import Segmentacion, Segmentador, apta_para, huecos_mordedura
 
+_HILOS: ThreadPoolExecutor | None = None
+
+
+def _obtener_hilos() -> ThreadPoolExecutor:
+    global _HILOS
+    limite = max(1, ajustes().inferencias_simultaneas)
+    if _HILOS is None or getattr(_HILOS, "_max_workers", None) != limite:
+        if _HILOS is not None:
+            _HILOS.shutdown(wait=False)
+        _HILOS = ThreadPoolExecutor(max_workers=limite, thread_name_prefix="segmentacion")
+    return _HILOS
+
+
 # La segmentación corre en paralelo con el router y el especialista (ONNX libera el GIL).
-_HILOS = ThreadPoolExecutor(max_workers=4, thread_name_prefix="segmentacion")
 ESPERA_MAXIMA_S = 2.0  # si se demora más, se sigue sin ella
 # Si menos de esta parte de la atención del modelo cae dentro de la máscara, la máscara probablemente
 # marcó otro objeto (por ejemplo una hoja en vez de la mazorca): se muestra el mapa completo, como antes.
@@ -87,9 +100,13 @@ def _segmentar_medido(seg: Segmentador, imagen: Image.Image) -> tuple[Segmentaci
 
 def diagnosticar(registro: Registro, imagen: Image.Image, segmentador=_POR_DEFECTO, regla_huecos: bool = True) -> Resultado:
     """segmentador: por defecto el del registro; None la desactiva (útil para comparar)."""
+    # Reduce a la resolución máxima de modelos y segmentación (512 px) si no venía reducida
+    if max(imagen.size) > 512:
+        imagen = imagen.copy()
+        imagen.thumbnail((512, 512), Image.BILINEAR)
     reloj = _Cronometro()
     seg = registro.segmentador if segmentador is _POR_DEFECTO else segmentador
-    tarea = _HILOS.submit(_segmentar_medido, seg, imagen) if seg is not None else None
+    tarea = _obtener_hilos().submit(_segmentar_medido, seg, imagen) if seg is not None else None
     try:
         return _diagnosticar(registro, imagen, reloj, tarea, regla_huecos=regla_huecos)
     finally:
@@ -202,20 +219,24 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
             if idx_cogollero is not None:
                 mejor = idx_cogollero
 
+    cam_mejor = salida.cam[mejor] if salida.cam is not None else None
+    del salida  # libera de inmediato el mapa de activación de las demás clases
+
     if hoja is not None and not apta_para(hoja, cultivo):
         hoja = None
         r.pasos[-1]["detalle"] = "La forma ubicada no parece una sola mazorca; se usa la foto completa"
-    if hoja is not None and salida.cam is not None:
-        if mapa_calor.fraccion_dentro(salida.cam[mejor], hoja.mascara) < ATENCION_MIN_DENTRO:
+    if hoja is not None and cam_mejor is not None:
+        if mapa_calor.fraccion_dentro(cam_mejor, hoja.mascara) < ATENCION_MIN_DENTRO:
             hoja = None
             r.pasos[-1]["detalle"] = "La IA miró sobre todo fuera de la zona ubicada; se muestra la foto completa"
     if hoja is not None:
         r.mascara_ok, r.contorno_hoja = True, hoja.contorno
 
     # 5. Mapa de calor de la clase ganadora (solo sobre la hoja si se ubicó)
-    if salida.cam is not None:
+    if cam_mejor is not None:
         r.mapa_calor_png_base64 = mapa_calor.png_base64(
-            salida.cam[mejor], *imagen.size, mascara=hoja.mascara if hoja else None)
+            cam_mejor, *imagen.size, mascara=hoja.mascara if hoja else None)
         _paso(r, "mapa_calor", "¿Dónde miró?",
               "Las zonas rojas son las que más pesaron en la decisión", reloj.vuelta())
+    del cam_mejor, hoja
     return r

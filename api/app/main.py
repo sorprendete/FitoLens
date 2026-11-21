@@ -1,4 +1,5 @@
 """Punto de entrada: `uvicorn app.main:app`. Carga modelos al arrancar y monta las rutas en /api."""
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -23,6 +24,7 @@ async def ciclo(app: FastAPI):
     a = ajustes()
     configurar_logs(a.log_nivel)
     app.state.registro = cargar(a.modelos_dir, a.ort_hilos, segmentar=a.segmentacion, volteo=a.volteo)
+    app.state.semaforo_inferencia = asyncio.Semaphore(a.inferencias_simultaneas)
     with fabrica()() as sesion:
         auth.asegurar_admin(sesion)
     yield

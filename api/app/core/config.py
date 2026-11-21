@@ -33,8 +33,10 @@ class Ajustes(BaseSettings):
     guardar_imagenes: bool = False  # guarda las fotos para reentrenar con datos de campo
     imagenes_dir: Path = Path("/datos/imagenes")
 
-    # Protección
+    # Protección y concurrencia
     limite_diagnosticos_minuto: int = 20  # por IP
+    inferencias_simultaneas: int = 2  # máximo de diagnósticos concurrentes por worker
+    espera_cola_s: float = 45.0  # tiempo máximo en cola (segundos) antes de responder 503
     login_max_fallos: int = 5  # fallos de un mismo correo antes de bloquearlo
     login_max_fallos_ip: int = 20  # más alto: en la feria muchos comparten el mismo wifi (misma IP)
     login_bloqueo_minutos: int = 15

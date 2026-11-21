@@ -117,3 +117,31 @@ def test_volteo_solo_si_esta_encendido(tmp_path):
         assert any("de cabeza" in p["detalle"] for p in r.pasos)
     finally:
         pipeline.LIMITE_VOLTEO = antes
+
+
+def test_semaforo_y_503_servidor_ocupado(cliente, monkeypatch):
+    from app.core.config import ajustes
+    # Espera mínima en cola para simular saturación rápida sin demorar la prueba
+    monkeypatch.setattr(ajustes(), "espera_cola_s", 0.05)
+    semaforo = cliente.app.state.semaforo_inferencia
+    cupos = semaforo._value
+    semaforo._value = 0
+    try:
+        r = enviar(cliente)
+        assert r.status_code == 503
+        assert r.json()["detail"] == "El servidor esta ocupado, intenta en unos segundos"
+    finally:
+        semaforo._value = cupos
+
+    # Con cupos disponibles, la petición concluye con 200
+    r_ok = enviar(cliente)
+    assert r_ok.status_code == 200
+
+
+def test_ajustes_concurrencia():
+    from app.core.config import Ajustes
+    from app.ia import pipeline
+    campos = Ajustes.model_fields
+    assert campos["inferencias_simultaneas"].default == 2
+    assert campos["espera_cola_s"].default == 45
+    assert callable(pipeline._obtener_hilos)

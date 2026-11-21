@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 
@@ -18,6 +19,14 @@ from app.rutas.dependencias import registro_modelos, usuario_opcional
 
 router = APIRouter(tags=["diagnóstico"])
 log = logging.getLogger("fitolens.diagnostico")
+
+
+def _obtener_semaforo(request: Request) -> asyncio.Semaphore:
+    semaforo = getattr(request.app.state, "semaforo_inferencia", None)
+    if semaforo is None:
+        semaforo = asyncio.Semaphore(ajustes().inferencias_simultaneas)
+        request.app.state.semaforo_inferencia = semaforo
+    return semaforo
 
 
 @router.post("/diagnostico", response_model=DiagnosticoSalida)
@@ -41,11 +50,20 @@ async def crear(
     if not registro.listo:
         raise HTTPException(503, "Los modelos no están cargados.")
 
-    inicio = time.perf_counter()
-    foto, datos, sha = await lector.leer(imagen)
-    # ONNX usa CPU varios cientos de ms: en un hilo aparte para no frenar las demás peticiones.
-    r = await run_in_threadpool(diagnosticar, registro, foto)
-    duracion = round((time.perf_counter() - inicio) * 1000)
+    semaforo = _obtener_semaforo(request)
+    try:
+        await asyncio.wait_for(semaforo.acquire(), timeout=a.espera_cola_s)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "El servidor esta ocupado, intenta en unos segundos")
+
+    try:
+        inicio = time.perf_counter()
+        foto, datos, sha = await lector.leer(imagen)
+        # ONNX usa CPU varios cientos de ms: en un hilo aparte para no frenar las demás peticiones.
+        r = await run_in_threadpool(diagnosticar, registro, foto)
+        duracion = round((time.perf_counter() - inicio) * 1000)
+    finally:
+        semaforo.release()
 
     fila = Diagnostico(
         usuario_id=usuario.id if usuario else None, origen=origen, estado=r.estado,
@@ -57,6 +75,7 @@ async def crear(
     await run_in_threadpool(_registrar, sesion, request, fila, r.estado, usuario, detalle)
     if a.guardar_imagenes:
         await run_in_threadpool(_guardar, datos, sha, r.cultivo or r.estado)
+    del foto, datos
     log.info("diagnostico id=%s estado=%s clase=%s conf=%s ms=%s",
              fila.id, r.estado, r.clase, r.confianza, duracion)
     return DiagnosticoSalida(id=fila.id, duracion_ms=duracion, **r.__dict__)
