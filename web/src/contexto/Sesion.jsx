@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { fijarToken, iniciarSesion, registrarse, yo } from '../api/cliente'
+import { fijarToken, iniciarSesion, iniciarSesionGoogle, registrarse, yo } from '../api/cliente'
 
 // Sesión del usuario: token JWT propio de la API, guardado en este navegador.
 // "invitado" = entró sin cuenta: puede diagnosticar y ver brotes, pero no tiene historial.
@@ -28,6 +28,7 @@ export function SesionProvider({ children }) {
     esAdmin: sesion?.usuario?.rol === 'admin',
     invitado: !!sesion?.invitado,
     async entrar(email, password) { const r = await iniciarSesion(email, password); setSesion({ token: r.access_token, usuario: r.usuario }) },
+    async entrarConGoogle(id_token) { const r = await iniciarSesionGoogle(id_token); setSesion({ token: r.access_token, usuario: r.usuario }) },
     async registrar(nombre, email, password) { const r = await registrarse(nombre, email, password); setSesion({ token: r.access_token, usuario: r.usuario }) },
     comoInvitado() { setSesion({ invitado: true }) },
     salir,

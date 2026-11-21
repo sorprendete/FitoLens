@@ -9,7 +9,8 @@ import {
   descargarGrupo,
   marcarSetupInicialCompletado,
 } from './gestorModelos'
-import { Novedad, instalarActualizacion, verificarParaDescargarModelos } from './actualizacion'
+import { Novedad, verificarParaDescargarModelos } from './actualizacion'
+import TarjetaActualizacion from './TarjetaActualizacion'
 import MisCultivos from './MisCultivos'
 
 export default function PantallaEleccionInicial({
@@ -43,22 +44,22 @@ export default function PantallaEleccionInicial({
     setError(null)
     setActualizacionReq(null)
 
-    // (C) Verificar si la app está al día antes de descargar modelos
-    const v = await verificarParaDescargarModelos()
-    if (!v.puedeDescargar) {
-      if (v.sinInternet) {
-        setError(v.mensaje ?? 'Sin internet no se pueden descargar modelos nuevos. Los modelos ya descargados siguen funcionando sin internet.')
-        return
-      }
-      if (v.requiereActualizacion && v.novedad) {
-        setActualizacionReq(v.novedad)
-        return
-      }
-    }
-
-    setDescargando(true)
-    const elegidos = GRUPOS_MODELO.filter((g) => seleccionados[g.id])
     try {
+      // (C) Verificar si la app está al día antes de descargar modelos
+      const v = await verificarParaDescargarModelos()
+      if (!v.puedeDescargar) {
+        if (v.sinInternet) {
+          setError(v.mensaje ?? 'Sin internet no se pueden descargar modelos nuevos. Los modelos ya descargados siguen funcionando sin internet.')
+          return
+        }
+        if (v.requiereActualizacion && v.novedad) {
+          setActualizacionReq(v.novedad)
+          return
+        }
+      }
+
+      setDescargando(true)
+      const elegidos = GRUPOS_MODELO.filter((g) => seleccionados[g.id])
       for (const g of elegidos) {
         await descargarGrupo(g.id).catch(() => {})
       }
@@ -72,7 +73,9 @@ export default function PantallaEleccionInicial({
   }
 
   const omitir = async () => {
-    await marcarSetupInicialCompletado()
+    try {
+      await marcarSetupInicialCompletado()
+    } catch {}
     alTerminar()
   }
 
@@ -95,26 +98,7 @@ export default function PantallaEleccionInicial({
 
           {/* Banner de actualización si la app no está al día */}
           {actualizacionReq && (
-            <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.acento }, brillo(C.acento)]}>
-              <Text style={[s.sobre, { color: C.acento }]}>ACTUALIZACIÓN REQUERIDA</Text>
-              <Text style={[s.titulo, { color: C.texto, fontSize: 18 }]}>
-                Para agregar cultivos primero actualiza la app a la {actualizacionReq.version}
-              </Text>
-              <Text style={[s.tenue, { color: C.tenue }]}>
-                Se requiere actualizar la app para asegurar la compatibilidad con los nuevos modelos especialistas.
-              </Text>
-              <Pressable
-                onPress={() => instalarActualizacion(actualizacionReq)}
-                style={({ pressed }) => [
-                  s.botonPrincipal,
-                  { backgroundColor: C.acento, marginTop: 8 },
-                  brillo(C.acento),
-                  pressed && { opacity: 0.8 },
-                ]}
-              >
-                <Text style={[s.botonPrincipalTxt, { color: C.textoBotonAcento }]}>Actualizar</Text>
-              </Pressable>
-            </View>
+            <TarjetaActualizacion novedad={actualizacionReq} />
           )}
 
           {!descargando ? (

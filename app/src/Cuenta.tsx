@@ -1,11 +1,18 @@
 // Pestaña Cuenta: vinculación a la web, selector de tema claro/oscuro, mis cultivos y provincia.
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { GoogleSignin, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin'
 import { ModoTema, useTema } from './tema'
-import { PROVINCIAS, alCambiar, cerrarSesion, cuentaActual, elegirProvincia, iniciarSesion, provinciaActual } from './cuenta'
+import { PROVINCIAS, alCambiar, cerrarSesion, cuentaActual, elegirProvincia, iniciarSesion, iniciarSesionGoogle, provinciaActual } from './cuenta'
 import { pendientes, sincronizar } from './historial'
-import { API } from './servidor'
+import { API, enLinea } from './servidor'
 import MisCultivos from './MisCultivos'
+
+const GOOGLE_WEB_CLIENT_ID = '57119843943-eri36uvtp35t2b0nuh6kqvoqt25fc6sp.apps.googleusercontent.com'
+
+try {
+  GoogleSignin.configure({ webClientId: GOOGLE_WEB_CLIENT_ID })
+} catch {}
 
 export default function Cuenta() {
   const { colores: C, modo, setModo, brillo } = useTema()
@@ -80,6 +87,7 @@ function Ingresar() {
   const [email, setEmail] = useState('')
   const [clave, setClave] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [cargandoGoogle, setCargandoGoogle] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const entrar = async () => {
@@ -87,6 +95,47 @@ function Ingresar() {
     try { await iniciarSesion(email, clave); setClave('') } catch (e: any) {
       setError(e?.message === 'Network request failed' ? 'Sin conexión. Para iniciar sesión hace falta internet una sola vez.' : e?.message ?? 'No se pudo iniciar sesión.')
     } finally { setCargando(false) }
+  }
+
+  const entrarGoogle = async () => {
+    setError(null)
+    setCargandoGoogle(true)
+    try {
+      const conectado = await enLinea()
+      if (!conectado) {
+        setError('Sin conexión. Para iniciar sesión con Google se necesita internet.')
+        return
+      }
+      await GoogleSignin.hasPlayServices()
+      const r = await GoogleSignin.signIn()
+      if (isSuccessResponse(r)) {
+        const idToken = r.data.idToken
+        if (!idToken) {
+          setError('No se pudo obtener el token de Google.')
+          return
+        }
+        await iniciarSesionGoogle(idToken)
+      }
+    } catch (e: any) {
+      if (e?.code === statusCodes.SIGN_IN_CANCELLED) {
+        return
+      }
+      if (e?.code === statusCodes.IN_PROGRESS) {
+        return
+      }
+      if (e?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        setError('Google Play Services no está disponible en este dispositivo.')
+        return
+      }
+      const msj = e?.message ?? ''
+      if (msj.includes('Network') || msj.includes('network') || msj === 'Network request failed') {
+        setError('Sin conexión. Para iniciar sesión con Google se necesita internet.')
+      } else {
+        setError(typeof e?.message === 'string' ? e.message : 'No se pudo iniciar sesión con Google.')
+      }
+    } finally {
+      setCargandoGoogle(false)
+    }
   }
 
   return (
@@ -99,10 +148,22 @@ function Ingresar() {
       <TextInput style={[s.campo, { backgroundColor: C.fondo2, borderColor: C.borde2, color: C.texto }]} placeholder="Contraseña" placeholderTextColor={C.tenue} value={clave} onChangeText={setClave}
         secureTextEntry autoComplete="password" onSubmitEditing={entrar} />
       {error && <Text style={{ color: C.coral }}>{error}</Text>}
-      <Pressable onPress={entrar} disabled={cargando || !email || !clave}
-        style={({ pressed }) => [s.boton, { backgroundColor: C.acento }, (pressed || cargando || !email || !clave) && { opacity: 0.6 }]}>
+      <Pressable onPress={entrar} disabled={cargando || cargandoGoogle || !email || !clave}
+        style={({ pressed }) => [s.boton, { backgroundColor: C.acento }, (pressed || cargando || cargandoGoogle || !email || !clave) && { opacity: 0.6 }]}>
         {cargando ? <ActivityIndicator color={C.textoBotonAcento} /> : <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Iniciar sesión</Text>}
       </Pressable>
+
+      <View style={s.separadorFila}>
+        <View style={[s.lineaSeparador, { backgroundColor: C.borde2 }]} />
+        <Text style={[s.separadorTxt, { color: C.tenue }]}>o</Text>
+        <View style={[s.lineaSeparador, { backgroundColor: C.borde2 }]} />
+      </View>
+
+      <Pressable onPress={entrarGoogle} disabled={cargando || cargandoGoogle}
+        style={({ pressed }) => [s.boton, { backgroundColor: C.fondo2, borderColor: C.borde2 }, (pressed || cargando || cargandoGoogle) && { opacity: 0.6 }]}>
+        {cargandoGoogle ? <ActivityIndicator color={C.texto} /> : <Text style={[s.botonTxt, { color: C.texto }]}>Continuar con Google</Text>}
+      </Pressable>
+
       <Pressable onPress={() => Linking.openURL(API)} style={{ minHeight: 44, justifyContent: 'center' }}>
         <Text style={[s.tenue, { color: C.acento }]}>¿No tienes cuenta? Créala en la web</Text>
       </Pressable>
@@ -137,7 +198,7 @@ function Vinculada({ pend, actualizar }: { pend: number; actualizar: () => void 
           style={({ pressed }) => [s.boton, { flex: 1, backgroundColor: C.acento }, (pressed || enviando || pend === 0) && { opacity: 0.6 }]}>
           <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>{enviando ? 'Subiendo…' : 'Subir ahora'}</Text>
         </Pressable>
-        <Pressable onPress={() => cerrarSesion()} style={({ pressed }) => [s.boton, { flex: 1, borderColor: C.borde2 }, pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => { cerrarSesion().catch(() => {}) }} style={({ pressed }) => [s.boton, { flex: 1, borderColor: C.borde2 }, pressed && { opacity: 0.6 }]}>
           <Text style={[s.botonTxt, { color: C.texto }]}>Cerrar sesión</Text>
         </Pressable>
       </View>
@@ -156,6 +217,9 @@ const s = StyleSheet.create({
   pie: { fontSize: 11, marginTop: 4 },
   fila: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   filaSelectorTema: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  separadorFila: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
+  lineaSeparador: { flex: 1, height: 1 },
+  separadorTxt: { fontSize: 13, fontWeight: '600' },
   opcionTema: {
     flex: 1,
     minHeight: 46,

@@ -94,6 +94,8 @@ export const obtenerMetricas = () => publico(() => pedir('/metricas'), mocks.met
 // --- Cuenta ---
 export const iniciarSesion = (email, password) =>
   privado(() => pedir('/auth/login', { metodo: 'POST', json: { email, password } }), () => mocks.login(email))
+export const iniciarSesionGoogle = (id_token) =>
+  privado(() => pedir('/auth/google', { metodo: 'POST', json: { id_token } }), () => mocks.login('google@fitolens.pe', 'Usuario Google'))
 export const registrarse = (nombre, email, password) =>
   privado(() => pedir('/auth/registro', { metodo: 'POST', json: { nombre, email, password } }), () => mocks.login(email, nombre))
 export const yo = () => privado(() => pedir('/auth/yo'), mocks.yo)

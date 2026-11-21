@@ -3,7 +3,7 @@
     "name": "FitoLens",
     "slug": "fitolens",
     "scheme": "fitolens",
-    "version": "2.3.0",
+    "version": "2.3.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -15,8 +15,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "pe.edu.unsm.fitolens",
       "infoPlist": {
-        "NSCameraUsageDescription": "FitoLens usa la cÃ¡mara para fotografiar hojas y mazorcas y diagnosticarlas.",
-        "NSPhotoLibraryUsageDescription": "FitoLens abre tu galerÃ­a para diagnosticar fotos que ya tomaste.",
+        "NSCameraUsageDescription": "FitoLens usa la cÃƒÂ¡mara para fotografiar hojas y mazorcas y diagnosticarlas.",
+        "NSPhotoLibraryUsageDescription": "FitoLens abre tu galerÃƒÂ­a para diagnosticar fotos que ya tomaste.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -41,7 +41,7 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "FitoLens usa la cÃ¡mara para fotografiar hojas y mazorcas y diagnosticarlas."
+          "cameraPermission": "FitoLens usa la cÃƒÂ¡mara para fotografiar hojas y mazorcas y diagnosticarlas."
         }
       ],
       [
@@ -54,7 +54,8 @@
             "deploymentTarget": "16.4"
           }
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "api": "https://fitolens.5-253-232-122.sslip.io"

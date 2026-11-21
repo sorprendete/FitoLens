@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTema } from './tema'
 import { Novedad, VERSION_APP, buscarActualizacion, esMayor, instalarActualizacion } from './actualizacion'
-import { disponible, escuchar, estado as consultarEstado, pausar, reanudar, cancelar, instalar, puedeInstalar, type EstadoDescarga } from '../modules/descarga-apk'
+import { disponible, escuchar, estado as consultarEstado, pausar, reanudar, cancelar, instalar, puedeInstalar, abrirAjustesInstalacion, type EstadoDescarga } from '../modules/descarga-apk'
+import { escucharTarjetaVisible, hayTarjetaVisible } from './TarjetaActualizacion'
 
 const CADA = 60 * 60 * 1000 // como mucho una consulta por hora
 
@@ -12,47 +13,90 @@ export default function AvisoActualizacion() {
   const [ed, setEd] = useState<EstadoDescarga | null>(null)
   const [oculto, setOculto] = useState(false)
   const [faltaPermiso, setFaltaPermiso] = useState(false)
+  const [tarjetaEnPantalla, setTarjetaEnPantalla] = useState(hayTarjetaVisible())
   const ultima = useRef(0)
 
   useEffect(() => {
+    return escucharTarjetaVisible(setTarjetaEnPantalla)
+  }, [])
+
+  useEffect(() => {
+    let montado = true
     const revisar = () => {
-      if (Date.now() - ultima.current < CADA) return
-      ultima.current = Date.now()
-      buscarActualizacion().then(setNueva)
+      try {
+        if (Date.now() - ultima.current < CADA) return
+        ultima.current = Date.now()
+        buscarActualizacion()
+          .then((n) => {
+            if (montado) setNueva(n)
+          })
+          .catch(() => {})
+      } catch {}
     }
     revisar()
-    const sub = AppState.addEventListener('change', (e) => e === 'active' && revisar())
-    return () => sub.remove()
+    const sub = AppState.addEventListener('change', (e) => {
+      if (e === 'active' && montado) revisar()
+    })
+    return () => {
+      montado = false
+      try { sub.remove() } catch {}
+    }
   }, [])
 
   useEffect(() => {
     if (!disponible) return
-    const vigente = (e: EstadoDescarga) => e.estado !== 'inactiva' && (!e.version || esMayor(e.version, VERSION_APP))
-    const inicial = consultarEstado()
-    if (vigente(inicial)) setEd(inicial)
+    let montado = true
+    const vigente = (e: EstadoDescarga | null | undefined): boolean => {
+      if (!e || typeof e !== 'object') return false
+      return e.estado !== 'inactiva' && (!e.version || esMayor(e.version, VERSION_APP))
+    }
+
+    try {
+      const inicial = consultarEstado()
+      if (montado && vigente(inicial)) setEd(inicial)
+    } catch {}
 
     const desuscribir = escuchar((e) => {
-      setEd(vigente(e) ? e : null)
-      if (e.estado !== 'lista') setFaltaPermiso(false)
+      if (!montado) return
+      try {
+        setEd(vigente(e) ? e : null)
+        if (e && e.estado !== 'lista') setFaltaPermiso(false)
+      } catch {}
     })
-    return desuscribir
+
+    return () => {
+      montado = false
+      try { desuscribir?.() } catch {}
+    }
   }, [])
 
   useEffect(() => {
     if (!faltaPermiso) return
+    let montado = true
     const sub = AppState.addEventListener('change', (e) => {
-      if (e === 'active' && puedeInstalar()) setFaltaPermiso(false)
+      try {
+        if (e === 'active' && montado && puedeInstalar()) {
+          setFaltaPermiso(false)
+          try { instalar() } catch {}
+        }
+      } catch {}
     })
-    return () => sub.remove()
+    return () => {
+      montado = false
+      try { sub.remove() } catch {}
+    }
   }, [faltaPermiso])
 
+  if (tarjetaEnPantalla) return null
   if (oculto && !ed) return null
   if (!nueva && !ed) return null
 
   if (ed && ed.estado !== 'inactiva') {
-    const pct = ed.total > 0 ? Math.round((ed.bytes / ed.total) * 100) : 0
-    const descMB = (ed.bytes / (1024 * 1024)).toFixed(0)
-    const totalMB = ed.total > 0 ? (ed.total / (1024 * 1024)).toFixed(0) : '?'
+    const total = ed.total > 0 ? ed.total : 0
+    const bytes = ed.bytes > 0 ? ed.bytes : 0
+    const pct = total > 0 ? Math.round((bytes / total) * 100) : 0
+    const descMB = (bytes / (1024 * 1024)).toFixed(0)
+    const totalMB = total > 0 ? (total / (1024 * 1024)).toFixed(0) : '?'
     const ver = ed.version || nueva?.version || ''
 
     let texto = ''
@@ -63,8 +107,12 @@ export default function AvisoActualizacion() {
         texto = `Descargando… ${pct} % · ${descMB} de ${totalMB} MB`
         botones = (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Pressable onPress={pausar} hitSlop={8} style={s.accionBtn}><Text style={[s.luego, { color: C.tenue }]}>Pausar</Text></Pressable>
-            <Pressable onPress={cancelar} hitSlop={8} style={s.accionBtn}><Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text></Pressable>
+            <Pressable onPress={() => { try { pausar() } catch {} }} hitSlop={8} style={s.accionBtn}>
+              <Text style={[s.luego, { color: C.tenue }]}>Pausar</Text>
+            </Pressable>
+            <Pressable onPress={() => { try { cancelar(); setEd(null) } catch {} }} hitSlop={8} style={s.accionBtn}>
+              <Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text>
+            </Pressable>
           </View>
         )
         break
@@ -72,8 +120,12 @@ export default function AvisoActualizacion() {
         texto = `En pausa · ${pct} %`
         botones = (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Pressable onPress={reanudar} style={[s.boton, { backgroundColor: C.acento }]}><Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Reanudar</Text></Pressable>
-            <Pressable onPress={cancelar} hitSlop={8} style={s.accionBtn}><Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text></Pressable>
+            <Pressable onPress={() => { try { reanudar() } catch {} }} style={[s.boton, { backgroundColor: C.acento }]}>
+              <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Reanudar</Text>
+            </Pressable>
+            <Pressable onPress={() => { try { cancelar(); setEd(null) } catch {} }} hitSlop={8} style={s.accionBtn}>
+              <Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text>
+            </Pressable>
           </View>
         )
         break
@@ -81,8 +133,12 @@ export default function AvisoActualizacion() {
         texto = `Sin conexión · ${pct} %`
         botones = (
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Pressable onPress={reanudar} style={[s.boton, { backgroundColor: C.acento }]}><Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Reintentar</Text></Pressable>
-            <Pressable onPress={cancelar} hitSlop={8} style={s.accionBtn}><Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text></Pressable>
+            <Pressable onPress={() => { try { reanudar() } catch {} }} style={[s.boton, { backgroundColor: C.acento }]}>
+              <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Reintentar</Text>
+            </Pressable>
+            <Pressable onPress={() => { try { cancelar(); setEd(null) } catch {} }} hitSlop={8} style={s.accionBtn}>
+              <Text style={[s.cancelar, { color: C.coral }]}>Cancelar</Text>
+            </Pressable>
           </View>
         )
         break
@@ -92,16 +148,30 @@ export default function AvisoActualizacion() {
           : 'Lista para instalar'
         botones = (
           <Pressable onPress={() => {
-            const res = instalar()
-            if (res === 'permiso_requerido') setFaltaPermiso(true)
-            else if (res === 'archivo_no_encontrado' || res === 'no_lista') { setEd(null); setFaltaPermiso(false) }
-          }} style={[s.boton, { backgroundColor: C.acento }]}><Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Instalar</Text></Pressable>
+            try {
+              const res = instalar()
+              if (res === 'permiso_requerido') {
+                setFaltaPermiso(true)
+                try { abrirAjustesInstalacion() } catch {}
+              }
+              else if (res === 'archivo_no_encontrado' || res === 'no_lista') {
+                setEd(null)
+                setFaltaPermiso(false)
+              }
+            } catch {
+              setEd(null)
+            }
+          }} style={[s.boton, { backgroundColor: C.acento }]}>
+            <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Instalar</Text>
+          </Pressable>
         )
         break
       case 'error':
         texto = ed.error || 'Error en la descarga'
         botones = (
-          <Pressable onPress={() => setEd(null)} hitSlop={8} style={s.accionBtn}><Text style={[s.luego, { color: C.tenue }]}>Cerrar</Text></Pressable>
+          <Pressable onPress={() => setEd(null)} hitSlop={8} style={s.accionBtn}>
+            <Text style={[s.luego, { color: C.tenue }]}>Cerrar</Text>
+          </Pressable>
         )
         break
     }
@@ -119,8 +189,10 @@ export default function AvisoActualizacion() {
 
   if (!nueva) return null
   const actualizar = () => {
-    setFaltaPermiso(false)
-    instalarActualizacion(nueva)
+    try {
+      setFaltaPermiso(false)
+      instalarActualizacion(nueva).catch(() => {})
+    } catch {}
   }
 
   return (
@@ -131,8 +203,12 @@ export default function AvisoActualizacion() {
           {nueva.notas || `Tienes la ${VERSION_APP}.${nueva.tamano_mb ? ` Descarga de ${nueva.tamano_mb} MB.` : ''}`}
         </Text>
       </View>
-      <Pressable onPress={() => setOculto(true)} hitSlop={8} style={s.accionBtn}><Text style={[s.luego, { color: C.tenue }]}>Luego</Text></Pressable>
-      <Pressable onPress={actualizar} style={[s.boton, { backgroundColor: C.acento }]}><Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Actualizar</Text></Pressable>
+      <Pressable onPress={() => setOculto(true)} hitSlop={8} style={s.accionBtn}>
+        <Text style={[s.luego, { color: C.tenue }]}>Luego</Text>
+      </Pressable>
+      <Pressable onPress={actualizar} style={[s.boton, { backgroundColor: C.acento }]}>
+        <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Actualizar</Text>
+      </Pressable>
     </View>
   )
 }

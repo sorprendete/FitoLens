@@ -33,28 +33,36 @@ export default function Inicio({
   } = useCultivosInstalados()
 
   const cargarDatos = useCallback(() => {
-    // 1. Historial local (SQLite)
-    const filas = listar()
-    setHistorial(filas)
+    try {
+      // 1. Historial local (SQLite)
+      const filas = listar()
+      setHistorial(filas || [])
 
-    // 2. Parcelas y alertas si hay sesión
-    const conCuenta = !!cuentaActual()
-    if (conCuenta) {
-      const parcs = listarParcelas()
-      setParcelas(parcs)
+      // 2. Parcelas y alertas si hay sesión
+      const conCuenta = !!cuentaActual()
+      if (conCuenta) {
+        const parcs = listarParcelas() || []
+        setParcelas(parcs)
 
-      const alertas: { parcela: Parcela; visita: Visita }[] = []
-      for (const p of parcs) {
-        const v = visitas(p.id)
-        if (v.length > 0) {
-          const ult = v[v.length - 1]
-          if (ult.severidad >= 2) {
-            alertas.push({ parcela: p, visita: ult })
-          }
+        const alertas: { parcela: Parcela; visita: Visita }[] = []
+        for (const p of parcs) {
+          try {
+            const v = visitas(p.id) || []
+            if (v.length > 0) {
+              const ult = v[v.length - 1]
+              if (ult && ult.severidad >= 2) {
+                alertas.push({ parcela: p, visita: ult })
+              }
+            }
+          } catch {}
         }
+        setAlertasParcelas(alertas)
+      } else {
+        setParcelas([])
+        setAlertasParcelas([])
       }
-      setAlertasParcelas(alertas)
-    } else {
+    } catch {
+      setHistorial([])
       setParcelas([])
       setAlertasParcelas([])
     }

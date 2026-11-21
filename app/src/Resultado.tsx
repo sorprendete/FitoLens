@@ -9,7 +9,8 @@ import BotonReporte from './BotonReporte'
 import { CULTIVOS, URGENCIA, esSana, infoClase } from './catalogo'
 import type { Resultado, Vision } from './ia'
 import { GRUPOS_MODELO, descargarGrupo, estaGrupoDisponible, escucharProgreso } from './gestorModelos'
-import { Novedad, instalarActualizacion, verificarParaDescargarModelos } from './actualizacion'
+import { Novedad, verificarParaDescargarModelos } from './actualizacion'
+import TarjetaActualizacion from './TarjetaActualizacion'
 import { enLinea, enviar } from './servidor'
 import { provinciaActual } from './cuenta'
 
@@ -226,23 +227,10 @@ export function TarjetaResultado({
 
         {/* Alerta si requiere actualizar la app antes de agregar este cultivo */}
         {actualizacionReq && (
-          <View style={[s.alertaActualizar, { backgroundColor: C.fondo2, borderColor: C.acento }, brillo(C.acento)]}>
-            <Text style={[s.sobre, { color: C.acento }]}>ACTUALIZACIÓN REQUERIDA</Text>
-            <Text style={[s.alertaTexto, { color: C.texto }]}>
-              Para agregar cultivos primero actualiza la app a la {actualizacionReq.version}
-            </Text>
-            <Pressable
-              onPress={() => instalarActualizacion(actualizacionReq)}
-              style={({ pressed }) => [
-                s.otra,
-                { backgroundColor: C.acento, minHeight: 46, marginTop: 4 },
-                brillo(C.acento),
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={[s.otraTxt, { color: C.textoBotonAcento }]}>Actualizar</Text>
-            </Pressable>
-          </View>
+          <TarjetaActualizacion
+            novedad={actualizacionReq}
+            onCerrar={() => setActualizacionReq(null)}
+          />
         )}
 
         {/* Mensaje claro si no hay internet */}

@@ -9,3 +9,6 @@ export const TIEMPO_ESPERA = 20000
 
 // Cada cuánto se actualiza el mapa de brotes (ms).
 export const REFRESCO_BROTES = 30000
+
+// ID de cliente Google para la web (Google Identity Services)
+export const GOOGLE_CLIENT_ID = '57119843943-eri36uvtp35t2b0nuh6kqvoqt25fc6sp.apps.googleusercontent.com'

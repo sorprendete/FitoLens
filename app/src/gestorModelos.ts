@@ -118,10 +118,12 @@ export function esVarianteLiviana(): boolean {
 
 export async function asegurarDirectorioModelos(): Promise<string> {
   const dir = CARPETA_MODELOS
-  const info = await FileSystem.getInfoAsync(dir)
-  if (!info.exists) {
-    await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
-  }
+  try {
+    const info = await FileSystem.getInfoAsync(dir)
+    if (!info.exists) {
+      await FileSystem.makeDirectoryAsync(dir, { intermediates: true })
+    }
+  } catch {}
   return dir
 }
 
@@ -133,12 +135,16 @@ export function rutaArchivoModelo(archivo: string): string {
  * Comprueba si un grupo de modelo está disponible para inferencia (sea incluido en APK o descargado).
  */
 export async function estaGrupoDisponible(grupoId: string): Promise<boolean> {
-  if (MODELOS_INCLUIDOS[grupoId]) return true
-  const infoGrupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
-  if (!infoGrupo) return false
-  const ruta = rutaArchivoModelo(infoGrupo.archivo)
-  const f = await FileSystem.getInfoAsync(ruta)
-  return !!f.exists && (f.size ?? 0) > 1000000
+  try {
+    if (MODELOS_INCLUIDOS[grupoId]) return true
+    const infoGrupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
+    if (!infoGrupo) return false
+    const ruta = rutaArchivoModelo(infoGrupo.archivo)
+    const f = await FileSystem.getInfoAsync(ruta)
+    return !!f.exists && (f.size ?? 0) > 1000000
+  } catch {
+    return false
+  }
 }
 
 /**
@@ -153,16 +159,24 @@ export function estaIncluidoEnApk(grupoId: string): boolean {
  * Si está en assets, devuelve null para que se use Asset.loadAsync.
  */
 export async function rutaLocalDescargada(grupoId: string): Promise<string | null> {
-  const infoGrupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
-  if (!infoGrupo) return null
-  const ruta = rutaArchivoModelo(infoGrupo.archivo)
-  const f = await FileSystem.getInfoAsync(ruta)
-  return f.exists && (f.size ?? 0) > 1000000 ? ruta : null
+  try {
+    const infoGrupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
+    if (!infoGrupo) return null
+    const ruta = rutaArchivoModelo(infoGrupo.archivo)
+    const f = await FileSystem.getInfoAsync(ruta)
+    return f.exists && (f.size ?? 0) > 1000000 ? ruta : null
+  } catch {
+    return null
+  }
 }
 
 async function verificarSha256(uri: string, shaEsperado: string): Promise<boolean> {
   try {
-    if (globalThis.crypto?.subtle?.digest) {
+    const info = await FileSystem.getInfoAsync(uri)
+    if (!info.exists || (info.size ?? 0) < 1000000) return false
+    // Si el archivo es grande (> 5MB), leer base64 en JS provoca OutOfMemoryError en Android.
+    // Solo usamos digest si es pequeño; de lo contrario validamos existencia y tamaño.
+    if (globalThis.crypto?.subtle?.digest && (info.size ?? 0) < 5 * 1024 * 1024) {
       const base64 = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 })
       const binStr = atob(base64)
       const bytes = new Uint8Array(binStr.length)
@@ -172,11 +186,14 @@ async function verificarSha256(uri: string, shaEsperado: string): Promise<boolea
       const hashHex = hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
       return hashHex.toLowerCase() === shaEsperado.toLowerCase()
     }
-    const info = await FileSystem.getInfoAsync(uri)
-    return !!info.exists && (info.size ?? 0) > 1000000
+    return true
   } catch {
-    const info = await FileSystem.getInfoAsync(uri)
-    return !!info.exists && (info.size ?? 0) > 1000000
+    try {
+      const info = await FileSystem.getInfoAsync(uri)
+      return !!info.exists && (info.size ?? 0) > 1000000
+    } catch {
+      return false
+    }
   }
 }
 
@@ -293,12 +310,18 @@ export async function borrarModeloDescargado(grupoId: string): Promise<void> {
 }
 
 export async function haCompletadoSetupInicial(): Promise<boolean> {
-  const val = await SecureStore.getItemAsync(K_SETUP_INICIAL)
-  return val === '1'
+  try {
+    const val = await SecureStore.getItemAsync(K_SETUP_INICIAL)
+    return val === '1'
+  } catch {
+    return false
+  }
 }
 
 export async function marcarSetupInicialCompletado(): Promise<void> {
-  await SecureStore.setItemAsync(K_SETUP_INICIAL, '1')
+  try {
+    await SecureStore.setItemAsync(K_SETUP_INICIAL, '1')
+  } catch {}
 }
 
 function formatearNombres(nombres: string[]): string {
@@ -317,14 +340,19 @@ export function useCultivosInstalados() {
   const [cargando, setCargando] = useState(true)
 
   const refrescar = useCallback(async () => {
-    const listos: GrupoModeloId[] = []
-    for (const g of GRUPOS_MODELO) {
-      if (await estaGrupoDisponible(g.id)) {
-        listos.push(g.id)
+    try {
+      const listos: GrupoModeloId[] = []
+      for (const g of GRUPOS_MODELO) {
+        try {
+          if (await estaGrupoDisponible(g.id)) {
+            listos.push(g.id)
+          }
+        } catch {}
       }
+      setGruposInstaladosIds(listos)
+    } catch {} finally {
+      setCargando(false)
     }
-    setGruposInstaladosIds(listos)
-    setCargando(false)
   }, [])
 
   useEffect(() => {

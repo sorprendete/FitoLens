@@ -53,6 +53,10 @@ class Login(BaseModel):
     password: str = Field(min_length=1, max_length=72)
 
 
+class LoginGoogle(BaseModel):
+    id_token: str = Field(min_length=1)
+
+
 class Registro(BaseModel):
     email: EmailStr
     nombre: str = Field(min_length=2, max_length=120)

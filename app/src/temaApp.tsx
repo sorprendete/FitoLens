@@ -109,7 +109,7 @@ export function TemaProvider({ children }: { children: React.ReactNode }) {
     return sistemaScheme === 'light' ? 'claro' : 'oscuro'
   }, [modo, sistemaScheme])
 
-  const colores = PALETAS[tema]
+  const colores = PALETAS[tema] ?? TEMA_OSCURO
   const esOscuro = tema === 'oscuro'
 
   const fnBrillo = useCallback((color: string) => brillo(color, !esOscuro), [esOscuro])

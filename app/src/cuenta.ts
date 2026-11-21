@@ -2,6 +2,7 @@
 // Sin cuenta la app funciona igual. El token se guarda cifrado (expo-secure-store) y dura 90 días.
 import { Platform } from 'react-native'
 import * as SecureStore from 'expo-secure-store'
+import { GoogleSignin } from '@react-native-google-signin/google-signin'
 import { API } from './servidor'
 
 export type Cuenta = { nombre: string; email: string; dispositivo: number; provincia: string | null }
@@ -59,9 +60,38 @@ export async function iniciarSesion(email: string, password: string) {
   avisar()
 }
 
+export async function iniciarSesionGoogle(idToken: string) {
+  const res = await fetch(`${API}/api/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id_token: idToken }),
+  })
+  const d = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(
+      typeof d?.detail === 'string'
+        ? d.detail
+        : res.status === 429
+        ? 'Demasiados intentos. Espera unos minutos.'
+        : res.status === 401
+        ? 'Autenticación con Google rechazada.'
+        : `Error ${res.status}`
+    )
+  }
+  token = d.access_token as string
+  const c = { nombre: d.usuario.nombre, email: d.usuario.email, dispositivo: d.dispositivo?.id ?? 0 }
+  await SecureStore.setItemAsync(K_TOKEN, token)
+  await SecureStore.setItemAsync(K_CUENTA, JSON.stringify(c))
+  cuenta = { ...c, provincia: provinciaGuardada }
+  avisar()
+}
+
 // Desvincula el teléfono. Los diagnósticos ya subidos se quedan en la web; los pendientes se quedan en el teléfono.
 export async function cerrarSesion() {
-  if (token && cuenta) {
+  try {
+    await GoogleSignin.signOut()
+  } catch {}
+  if (token && cuenta && cuenta.dispositivo) {
     const t = token, id = cuenta.dispositivo
     fetch(`${API}/api/dispositivos/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${t}` } }).catch(() => {})
   }

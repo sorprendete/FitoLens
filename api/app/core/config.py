@@ -19,6 +19,10 @@ class Ajustes(BaseSettings):
     registro_abierto: bool = False  # si es False, solo un admin crea cuentas
     admin_usuario: str | None = None  # email del admin que se crea al arrancar si no existe
     admin_clave: str | None = None
+    google_client_ids: str = (
+        "57119843943-eri36uvtp35t2b0nuh6kqvoqt25fc6sp.apps.googleusercontent.com,"
+        "57119843943-m2sm6dhkgc3pe94mqec75gtukuoog835.apps.googleusercontent.com"
+    )
 
     # Modelos de IA
     modelos_dir: Path = Path("/modelos")

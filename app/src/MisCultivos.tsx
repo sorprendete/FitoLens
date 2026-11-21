@@ -16,7 +16,8 @@ import {
   reanudarDescarga,
   cancelarDescarga,
 } from './gestorModelos'
-import { Novedad, instalarActualizacion, verificarParaDescargarModelos } from './actualizacion'
+import { Novedad, verificarParaDescargarModelos } from './actualizacion'
+import TarjetaActualizacion from './TarjetaActualizacion'
 
 export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
   const { colores: C, brillo } = useTema()
@@ -65,31 +66,11 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
 
       {/* Aviso de actualización requerida para descargar */}
       {avisoActualizar && (
-        <View style={[s.tarjetaAlerta, { backgroundColor: C.fondo2, borderColor: C.acento }, brillo(C.acento)]}>
-          <Text style={[s.sobre, { color: C.acento }]}>ACTUALIZACIÓN REQUERIDA</Text>
-          <Text style={[s.alertaTitulo, { color: C.texto }]}>
-            Para agregar cultivos primero actualiza la app a la {avisoActualizar.version}
-          </Text>
-          <Text style={[s.tenue, { color: C.tenue }]}>
-            El servidor requiere una versión actualizada de FitoLens antes de incorporar nuevos modelos especialistas.
-          </Text>
-          <View style={s.filaBotones}>
-            <Pressable
-              onPress={() => instalarActualizacion(avisoActualizar)}
-              style={({ pressed }) => [
-                s.botonActualizar,
-                { backgroundColor: C.acento },
-                brillo(C.acento),
-                pressed && { opacity: 0.8 },
-              ]}
-            >
-              <Text style={[s.botonActualizarTxt, { color: C.textoBotonAcento }]}>Actualizar</Text>
-            </Pressable>
-            <Pressable onPress={() => setAvisoActualizar(null)} style={s.accionBtn}>
-              <Text style={{ color: C.tenue, fontWeight: '600' }}>Cerrar</Text>
-            </Pressable>
-          </View>
-        </View>
+        <TarjetaActualizacion
+          novedad={avisoActualizar}
+          onCerrar={() => setAvisoActualizar(null)}
+          descripcion="El servidor requiere una versión actualizada de FitoLens antes de incorporar nuevos modelos especialistas."
+        />
       )}
 
       {/* Aviso de sin internet */}

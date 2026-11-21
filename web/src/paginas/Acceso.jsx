@@ -1,6 +1,7 @@
 import { ArrowRight, Eye, EyeOff, Fingerprint, Lock, LogIn, Mail, Moon, Radar, ScanSearch, ShieldCheck, Smartphone, Sun, User, UserPlus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Logo from '../componentes/Logo'
+import { GOOGLE_CLIENT_ID } from '../config'
 import { useSesion } from '../contexto/Sesion'
 import { usarTema } from '../datos/tema'
 
@@ -20,10 +21,73 @@ export default function Acceso({ modo }) {
   const [verConfirmar, setVerConfirmar] = useState(false)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
+  const [googleListo, setGoogleListo] = useState(false)
+  const googleBtnRef = useRef(null)
   const cambiar = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const nivel = fuerza(f.password)
   const noCoinciden = registro && confirmarPassword.length > 0 && f.password !== confirmarPassword
   const botonDeshabilitado = enviando || (registro && (!confirmarPassword || f.password !== confirmarPassword || nivel < 3))
+
+  useEffect(() => {
+    let activo = true
+
+    function inicializarGsi() {
+      if (!activo || !window.google?.accounts?.id || !googleBtnRef.current) return
+      try {
+        window.google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: async (res) => {
+            if (!res?.credential) return
+            setError('')
+            setEnviando(true)
+            try {
+              await s.entrarConGoogle(res.credential)
+              location.hash = 'panel'
+            } catch (err) {
+              setError(err?.message || 'No se pudo iniciar sesión con Google.')
+            } finally {
+              setEnviando(false)
+            }
+          },
+        })
+        googleBtnRef.current.innerHTML = ''
+        window.google.accounts.id.renderButton(googleBtnRef.current, {
+          theme: tema === 'oscuro' ? 'filled_black' : 'outline',
+          size: 'large',
+          width: 320,
+          text: registro ? 'signup_with' : 'signin_with',
+          locale: 'es',
+        })
+        setGoogleListo(true)
+      } catch {
+        setGoogleListo(false)
+      }
+    }
+
+    if (window.google?.accounts?.id) {
+      inicializarGsi()
+    } else {
+      let script = document.querySelector('script[src="https://accounts.google.com/gsi/client"]')
+      if (!script) {
+        script = document.createElement('script')
+        script.src = 'https://accounts.google.com/gsi/client'
+        script.async = true
+        script.defer = true
+        document.head.appendChild(script)
+      }
+      const alCargar = () => inicializarGsi()
+      const alFallar = () => { if (activo) setGoogleListo(false) }
+      script.addEventListener('load', alCargar)
+      script.addEventListener('error', alFallar)
+      return () => {
+        activo = false
+        script.removeEventListener('load', alCargar)
+        script.removeEventListener('error', alFallar)
+      }
+    }
+
+    return () => { activo = false }
+  }, [tema, registro, s])
 
   async function enviar(e) {
     e.preventDefault()
@@ -123,6 +187,12 @@ export default function Acceso({ modo }) {
             {enviando ? <span className="girando" /> : registro ? <UserPlus size={19} /> : <LogIn size={19} />}
             {registro ? 'Crear cuenta' : 'Ingresar'}
           </button>
+          {googleListo && (
+            <>
+              <div className="separador"><span>o</span></div>
+              <div ref={googleBtnRef} style={{ display: 'flex', justifyContent: 'center', minHeight: 44 }} />
+            </>
+          )}
           <div className="separador"><span>o</span></div>
           <button type="button" className="btn sec ancho" onClick={() => { s.comoInvitado(); location.hash = 'diagnostico' }}>
             Probar sin cuenta<ArrowRight size={18} />

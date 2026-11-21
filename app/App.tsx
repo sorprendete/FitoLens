@@ -46,17 +46,23 @@ function AppContenido() {
 
   // Cuenta opcional: sincronización en segundo plano
   useEffect(() => {
-    cargarCuenta()
-    return sincronizarSola()
+    try {
+      cargarCuenta()
+      return sincronizarSola()
+    } catch {}
   }, [])
 
   // Comprobar si requiere elección inicial de cultivos (variante ligera)
   useEffect(() => {
-    if (esVarianteLiviana()) {
-      haCompletadoSetupInicial().then((listo) => {
-        if (!listo) setMostrarSetup(true)
-      })
-    }
+    try {
+      if (esVarianteLiviana()) {
+        haCompletadoSetupInicial()
+          .then((listo) => {
+            if (!listo) setMostrarSetup(true)
+          })
+          .catch(() => {})
+      }
+    } catch {}
   }, [])
 
   return (
