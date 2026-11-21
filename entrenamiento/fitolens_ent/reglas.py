@@ -130,7 +130,7 @@ def maiz(carpeta, cfg):
     s = _norm(carpeta)
     if re.search(r"healthy|sana|sano|saludable", s):
         return "maiz_sana"
-    if re.search(r"fall\s*armyworm|armyworm|spodoptera|cogollero|gusano", s):
+    if re.search(r"fall\s*armyworm|armyworm|spodoptera|cogollero|gusano|worm\s*affect", s):
         return "maiz_gusano_cogollero"
     if re.search(r"blight|tizon|turcicum|exserohilum", s):
         return "maiz_tizon_hoja"

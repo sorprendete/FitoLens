@@ -298,6 +298,78 @@ def main():
     log(f"PRUEBA DE CAMPO: n={campo['n']} accuracy={campo['accuracy']} IC95={campo['accuracy_ic95']} "
         f"f1_macro={campo['f1_macro']} | con umbral {c['umbral']}: {campo['con_umbral']}")
 
+    if a.modelo == "maiz":
+        log("==================== EVALUACIÓN MODELO MAÍZ ====================")
+        log(f"Accuracy de campo: {campo['accuracy']:.4f} (IC95: {campo['accuracy_ic95']})")
+        log("Matriz de confusión de campo:")
+        log(f"{'':>25} " + " ".join(f"{c[:10]:>10}" for c in clases))
+        for idx_c, fila in enumerate(campo["matriz_confusion"]):
+            log(f"{clases[idx_c]:>25} " + " ".join(f"{v:10d}" for v in fila))
+
+        from .aumentos import cargar_como_api
+        from PIL import Image
+        import glob
+        candidatos_campo = [
+            os.path.join(a.trabajo, "fotos_campo"),
+            os.path.join(os.getcwd(), "entrenamiento", "fotos_campo"),
+            os.path.join(os.getcwd(), "fotos_campo"),
+            os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fotos_campo")),
+        ]
+        if os.path.isdir(datos.KAGGLE_INPUT):
+            for nom in ("fotos_campo", "fitolens-fotos-campo", "fotos-campo"):
+                d = datos._buscar_input(nom)
+                if d:
+                    candidatos_campo.append(d)
+
+        fotos_campo_encontradas = []
+        for c_dir in candidatos_campo:
+            if os.path.isdir(c_dir):
+                for p in glob.glob(os.path.join(c_dir, "**", "*"), recursive=True):
+                    if p.lower().endswith(datos.EXT) and p not in fotos_campo_encontradas:
+                        fotos_campo_encontradas.append(p)
+
+        if not any("ronald_huecos" in os.path.basename(p).lower() for p in fotos_campo_encontradas):
+            for p_alt in [
+                os.path.join(os.getcwd(), "api", "pruebas", "huecos", "fotos", "maiz_gusano_cogollero", "ronald_huecos.jpg"),
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "api", "pruebas", "huecos", "fotos", "maiz_gusano_cogollero", "ronald_huecos.jpg")),
+                os.path.join(os.getcwd(), "entrenamiento", "fotos_propias", "maiz_gusano_cogollero", "ronald_huecos.jpg"),
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fotos_propias", "maiz_gusano_cogollero", "ronald_huecos.jpg")),
+            ]:
+                if os.path.exists(p_alt) and p_alt not in fotos_campo_encontradas:
+                    fotos_campo_encontradas.append(p_alt)
+
+        log(f"Predicciones para fotos de campo ({len(fotos_campo_encontradas)} fotos) SIN reglas:")
+        pred_ronald = None
+        conf_ronald = 0.0
+        red.eval()
+        for ruta_f in fotos_campo_encontradas:
+            nom = os.path.basename(ruta_f)
+            img = Image.open(ruta_f)
+            t_img = cargar_como_api(img, r["tam"]).unsqueeze(0).to(DISP)
+            with torch.no_grad():
+                l = red(t_img)
+                if r["tta"]:
+                    l = (l + red(torch.flip(t_img, dims=[3]))) / 2
+                probs = torch.softmax(l, dim=1).cpu().numpy()[0]
+            pred_k = int(np.argmax(probs))
+            clase_pred = clases[pred_k]
+            conf = float(probs[pred_k])
+            log(f"   {nom:35} -> {clase_pred:25} (conf: {conf:.1%}) [SIN reglas]")
+            if "ronald_huecos" in nom.lower():
+                pred_ronald = clase_pred
+                conf_ronald = conf
+
+        if not a.prueba:
+            assert campo["accuracy"] >= 0.959, (
+                f"FALLO VISIBLE: Accuracy de campo {campo['accuracy']:.4f} baja del mínimo de 95.9 % (0.9590)."
+            )
+            if pred_ronald is not None:
+                assert pred_ronald == "maiz_gusano_cogollero", (
+                    f"FALLO VISIBLE: La foto de Ronald no salió 'maiz_gusano_cogollero' (dio '{pred_ronald}' conf={conf_ronald:.1%})."
+                )
+            else:
+                log("AVISO: No se encontró la foto de Ronald para validación directa.")
+
     # carpeta final con el contrato de la API
     dest = os.path.join(a.salida, a.modelo)
     shutil.rmtree(dest, ignore_errors=True)

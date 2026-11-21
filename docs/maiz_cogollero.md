@@ -64,7 +64,7 @@ Se realizaron intervenciones pequeñas y específicas en el código de entrenami
 ### 1. `entrenamiento/fitolens_ent/catalogo.py`
 - Se agregó el especialista `"maiz"` a `CLASES` con sus 5 variantes: `maiz_sana`, `maiz_tizon_hoja`, `maiz_roya_comun`, `maiz_mancha_gris`, `maiz_gusano_cogollero`.
 - Se registraron sus etiquetas formales en `ETIQUETAS` y se vinculó en `ESPECIALISTA_DE_CULTIVO["maiz"] = "maiz"`.
-- Se añadieron las fuentes `maiz_bd` (Mendeley `sb4wwjs8bz`) y `maiz_mld` (Mendeley `3myfctrgk3`) en `FUENTES`.
+- Se añadieron las fuentes `maiz_bd` (Mendeley `sb4wwjs8bz`), `maiz_mld` (Mendeley `3myfctrgk3`), `maiz_armyworm` (Kaggle `humphreyassibi/armyworm-and-affected-plants`) y `maiz_ccmt` (Kaggle `rahimanshu/ccmt-plant-disease-dataset`) en `FUENTES` como opcionales (`requerido=False`).
 - Se configuró la receta específica `RECETA_POR_MODELO["maiz"]` con:
   - `escala_recorte_min=0.60` (evita recortes pequeños que eliminen los huecos).
   - `sobremuestreo={"maiz_gusano_cogollero": 2.5}` (aumenta 2.5 veces la probabilidad de muestreo de fotos de cogollero en cada época).
@@ -92,11 +92,15 @@ Se realizaron intervenciones pequeñas y específicas en el código de entrenami
   - Se propagaron los parámetros `escala_min` y `cultivo` al `Conjunto` de datos.
 - En `metricas()` y `elegir_umbral()`:
   - Se agregó la verificación de conflicto para maíz: las predicciones donde la diferencia entre cogollero y tizón sea menor a 0.15 se excluyen de las respuestas válidas con umbral (quedan como no concluyentes).
+- En la evaluación final de maíz:
+  - Imprime la accuracy de campo con IC95 y la matriz de confusión completa.
+  - Evalúa las fotos de `entrenamiento/fotos_campo/` (incluyendo la foto de Ronald) **SIN reglas**.
+  - Detiene la ejecución visiblemente (`assert`) si la precisión de campo cae por debajo del 95.9 % o si la foto de Ronald no es predicha como `maiz_gusano_cogollero`.
 - En la generación de `manifest.json`:
   - Se añade la propiedad `regla_no_seguro` documentando el margen mínimo de 0.15 y las clases en conflicto.
 
 ### 5. `entrenamiento/construir_notebooks.py`
-- Se incluyó `"maiz"` en la lista `MODELOS`, permitiendo generar tanto `fitolens_maiz.ipynb` como la celda de maíz en `fitolens_todos.ipynb`.
+- Se incluyó `"maiz"` en la lista `MODELOS` y se agregó una celda final de validación obligatoria para maíz con aserción visible de $\ge 95.9\%$ y acierto en la foto de Ronald sin reglas.
 
 ---
 
@@ -119,43 +123,40 @@ Para solucionar definitivamente la confusión morfológica en el clasificador, s
 
 ---
 
-## 5. Procedimiento para Reentrenar en Kaggle
+## 5. Procedimiento para Reentrenar en Kaggle (Pasos Exactos para Ronald)
 
-Sigue estos pasos en la siguiente ronda de entrenamiento en Kaggle:
+Sigue estos pasos en la siguiente ronda de reentrenamiento del modelo de maíz en Kaggle:
 
-1. **Subir las imágenes actualizadas:**
-   - Sube las fotos nuevas a tu dataset privado de Kaggle `ronaldlchuquilin/fitolens-maiz-citricos` en la carpeta correspondiente a cogollero (`maiz_gusano_cogollero`).
-   - O bien súbelas como dataset independiente con el nombre `fitolens-maiz-mld` o `fitolens-maiz`.
-2. **Regenerar los notebooks del repositorio:**
-   - Si trabajas en un entorno con terminal habilitada:
-     ```bash
-     python entrenamiento/construir_notebooks.py
-     ```
-   - Esto actualizará `entrenamiento/notebooks/fitolens_todos.ipynb` e incluirá `fitolens_maiz.ipynb`.
-3. **Importar y configurar en Kaggle:**
-   - En [kaggle.com](https://www.kaggle.com): **Create → New Notebook → File → Import Notebook**.
-   - Sube `fitolens_maiz.ipynb` (para entrenar solo maíz en ~30-45 min) o `fitolens_todos.ipynb`.
-   - En el panel derecho (*Settings*):
-     - **Accelerator**: `GPU T4 x2` o `GPU P100`.
-     - **Internet**: `On`.
-   - Con **+ Add Input**, añade los datasets requeridos:
-     - `ronaldlchuquilin/fitolens-maiz-citricos`
-     - Datasets base de respaldo si aplica.
+1. **Notebook a abrir en Kaggle:**
+   - En [kaggle.com](https://www.kaggle.com): entra con tu cuenta verificada por teléfono.
+   - Ve a **Create → New Notebook → File → Import Notebook**.
+   - Sube y abre `entrenamiento/notebooks/fitolens_maiz.ipynb` (o `fitolens_todos.ipynb`).
+
+2. **Configuración de hardware (Panel derecho — Settings):**
+   - **Accelerator**: Selecciona **GPU T4 x2** (o **GPU P100**). Sin GPU activa el entrenamiento no podrá correr en tiempo razonable.
+   - **Internet**: Activa **Internet = On** (indispensable para librerías iniciales y descargar fuentes públicas).
+
+3. **Qué subir con "+ Add Input" (Panel derecho):**
+   - Agrega los datasets de campo de gusano cogollero:
+     - `humphreyassibi/armyworm-and-affected-plants` (dataset público de Kaggle con daño foliar y perforaciones)
+     - `rahimanshu/ccmt-plant-disease-dataset` (dataset público CCMT con clase *Maize_fall armyworm*)
+     - `ronaldlchuquilin/fitolens-maiz-citricos` (tu dataset privado en Kaggle)
+   - Si tienes fotos nuevas de campo de San Martín: crea y sube a Kaggle un dataset llamado `fitolens-fotos-propias` con la estructura:
+     - `fotos_propias/<clase>/*.jpg` (para fotos de entrenamiento adicionales, multiplicadas x5 con aumentos)
+     - `fotos_campo/` (fotos de prueba de campo, incluyendo `ronald_huecos.jpg` que no entra a entrenamiento)
+
 4. **Ejecutar el entrenamiento:**
-   - Menú **Save Version → Save & Run All (Commit)**.
-   - El script ejecutará:
-     ```bash
-     python -m fitolens_ent.entrenar --modelo maiz
-     ```
-   - El script entrenará los backbones (`convnext_tiny` y `tf_efficientnetv2_b2`), aplicará el sobremuestreo y los nuevos aumentos conservadores, evaluará la temperatura y seleccionará el mejor backbone basado en validación de campo.
-5. **Descargar y empaquetar resultados:**
+   - Menú superior: **Save Version → Save & Run All (Commit)**. Corre solo en la nube.
+   - Al finalizar, el notebook imprimirá obligatoriamente:
+     - **Accuracy de campo** con intervalo de confianza al 95 % y la **matriz de confusión** completa.
+     - **Predicción para las fotos de campo** (`fotos_campo/`, incluyendo `ronald_huecos.jpg`) **SIN reglas** (inferencia directa de la red).
+     - El pipeline fallará visiblemente con una aserción si la precisión de campo baja de **95.9 %** o si la foto de Ronald no es diagnosticada como `maiz_gusano_cogollero`.
+
+5. **Cómo traer el modelo resultante:**
    - En la pestaña **Output** del notebook, descarga `salida/modelo_maiz.zip`.
-   - Revisa `salida/maiz/metricas.json` verificando:
-     - F1 macro en prueba de campo $\ge 0.85$.
-     - Que `maiz_gusano_cogollero` no tenga recall cercano a cero.
-     - Que la regla de ambigüedad haya filtrado las muestras dudosas hacia `con_umbral`.
-   - Empaqueta el modelo resultante con los demás modelos para el Release de GitHub:
+   - En tu equipo local, descomprímelo en `modelos/maiz/` (contiene `model.onnx`, `manifest.json` y `metricas.json`).
+   - Para desplegarlo en el VPS:
      ```bash
      python entrenamiento/empaquetar_modelos.py modelo_router.zip modelo_hortalizas.zip modelo_cafe.zip modelo_cacao.zip modelo_maiz.zip
      ```
-   - Sube el archivo `modelos.zip` al Release de GitHub (`modelos-vN`) y actualiza el VPS con `./fitolens.sh modelos modelos-vN`.
+     Sube el `modelos.zip` resultante al Release de GitHub (`modelos-vN`) y en el VPS ejecuta `./fitolens.sh modelos modelos-vN`.

@@ -102,6 +102,24 @@ FUENTES = {
         modelos=["maiz", "router"], requerido=False,
         cita="MLD: Multi-Class Maize Leaf Disease Image Dataset, Mendeley Data, 10.17632/3myfctrgk3.1",
         licencia="CC BY 4.0"),
+    # Verificado en Kaggle: humphreyassibi/armyworm-and-affected-plants (fotos de campo de daño de fall armyworm en hojas de maíz)
+    "maiz_armyworm": dict(
+        tipo="kaggle", ref="humphreyassibi/armyworm-and-affected-plants", campo=True, regla="maiz",
+        modelos=["maiz", "router"], requerido=False,
+        cita="Humphrey Assibi, Armyworm and Affected Plants, Kaggle humphreyassibi/armyworm-and-affected-plants",
+        licencia="CC BY 4.0 / ver Kaggle"),
+    # Verificado en Kaggle: rahimanshu/ccmt-plant-disease-dataset (fotos de campo naturales, incluye clase Maize_fall armyworm)
+    "maiz_ccmt": dict(
+        tipo="kaggle", ref="rahimanshu/ccmt-plant-disease-dataset", campo=True, regla="maiz",
+        modelos=["maiz", "router"], requerido=False,
+        cita="CCMT Plant Disease Dataset (Verma et al.), Kaggle rahimanshu/ccmt-plant-disease-dataset",
+        licencia="CC BY 4.0"),
+    # Verificado en Kaggle: dataset privado de Ronald con fotos de campo de maíz y cítricos
+    "maiz_citricos": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", campo=True, regla="maiz",
+        modelos=["maiz", "router"], requerido=False,
+        cita="Ronald Chuquilin, Fitolens Maíz y Cítricos, Kaggle ronaldlchuquilin/fitolens-maiz-citricos",
+        licencia="privada"),
     "no_planta": dict(
         tipo="kaggle", ref="prasunroy/natural-images", campo=True, regla="no_planta",
         modelos=["router"], requerido=True,
