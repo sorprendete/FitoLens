@@ -28,6 +28,67 @@ export async function buscarActualizacion(): Promise<Novedad | null> {
   } catch { return null } finally { clearTimeout(t) }
 }
 
+export type VerificacionDescarga = {
+  puedeDescargar: boolean
+  sinInternet?: boolean
+  requiereActualizacion?: boolean
+  versionRequerida?: string
+  novedad?: Novedad
+  mensaje?: string
+}
+
+/**
+ * Consulta si la app está al día antes de permitir descargar cualquier modelo especialista.
+ * Si no hay internet, lo indica claramente (los modelos ya descargados siguen funcionando).
+ * Si hay versión nueva o el índice modelos.json pide version_app_minima, exige actualizar antes.
+ */
+export async function verificarParaDescargarModelos(): Promise<VerificacionDescarga> {
+  const online = await enLinea()
+  if (!online) {
+    return {
+      puedeDescargar: false,
+      sinInternet: true,
+      mensaje: 'Sin internet no se pueden descargar modelos nuevos. Los modelos ya descargados siguen funcionando sin internet.',
+    }
+  }
+
+  // 1. Consulta si hay versión nueva de la app (buscarActualizacion sin el límite de 1 hora)
+  let novedad = await buscarActualizacion()
+
+  // 2. Consulta modelos.json para version_app_minima
+  try {
+    const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 6000)
+    const r = await fetch(`${API}/descargas/modelos/modelos.json?t=${Date.now()}`, {
+      signal: ctl.signal,
+      headers: { 'Cache-Control': 'no-cache' },
+    })
+    if (r.ok) {
+      const d = await r.json()
+      const minVer = d?.version_app_minima ? String(d.version_app_minima) : null
+      if (minVer && esMayor(minVer, VERSION_APP)) {
+        if (!novedad) {
+          novedad = { version: minVer }
+        } else if (esMayor(minVer, novedad.version)) {
+          novedad.version = minVer
+        }
+      }
+    }
+    clearTimeout(t)
+  } catch {}
+
+  if (novedad) {
+    return {
+      puedeDescargar: false,
+      requiereActualizacion: true,
+      versionRequerida: novedad.version,
+      novedad,
+      mensaje: `Para agregar cultivos primero actualiza la app a la ${novedad.version}`,
+    }
+  }
+
+  return { puedeDescargar: true }
+}
+
 /**
  * Pide permiso de notificaciones (Android 13+) y arranca la descarga en segundo plano
  * con el módulo nativo. Si el módulo no está disponible, abre la URL en el navegador.
@@ -35,11 +96,10 @@ export async function buscarActualizacion(): Promise<Novedad | null> {
 export async function instalarActualizacion(novedad: Novedad) {
   // Plan A: módulo nativo de descarga en segundo plano
   if (moduloDisponible) {
-    // Pedir permiso de notificaciones en Android 13+ (API 33+) sin bloquear la descarga
     if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
       try {
         PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => {})
-      } catch { /* si no lo concede, la descarga funciona igual pero sin notificación */ }
+      } catch {}
     }
     iniciarDescarga(APK, novedad.version, novedad.sha256)
     return

@@ -8,6 +8,10 @@ $ErrorActionPreference = 'Stop'
 $corta = 'C:\f'
 if ($PSScriptRoot -ne $corta) {
   robocopy $PSScriptRoot $corta /MIR /XD "$PSScriptRoot\android\build" "$PSScriptRoot\android\app\build" "$PSScriptRoot\android\app\.cxx" "$PSScriptRoot\android\.gradle" /XF FitoLens.apk /NFL /NDL /NJH /NJS /NP | Out-Null
+  # Variante: liviana (por defecto, solo el router; los cultivos se descargan) o completa ($env:FITOLENS_VARIANTE='completo', para la feria sin internet)
+  # Borra los recursos generados de la compilacion anterior (si no, la variante liviana arrastra los modelos viejos)
+  foreach ($r in @("$corta\android\app\build\generated\res\react", "$corta\android\app\build\intermediates\packaged_res", "$corta\android\app\build\intermediates\merged_res")) { if (Test-Path $r) { Remove-Item $r -Recurse -Force } }
+  if ($env:FITOLENS_VARIANTE -eq 'completo') { Copy-Item "$corta\src\modelosIncluidos.completo.ts" "$corta\src\modelosIncluidos.ts" -Force }
   & powershell -ExecutionPolicy Bypass -File "$corta\compilar_apk.ps1"
   if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
   Copy-Item "$corta\FitoLens.apk" "$PSScriptRoot\FitoLens.apk" -Force

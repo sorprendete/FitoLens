@@ -1,16 +1,43 @@
-// Modelos que viajan dentro de la app, en el formato de entrenamiento/movil/cuantizar.py:
-// assets/modelos/<nombre>.onnx + modelos.json. Para cambiarlos, vuelve a correr ese script y recompila.
+// Catálogo y resolución de archivos .onnx (incluidos en APK o descargados en documentDirectory/modelos/).
+import { MODELOS_INCLUIDOS } from './modelosIncluidos'
+import { estaGrupoDisponible, rutaLocalDescargada } from './gestorModelos'
+
 const INFO: { modelos: any[] } = require('../assets/modelos/modelos.json')
 
-const ARCHIVOS = {
-  router: require('../assets/modelos/router.onnx'),
-  hortalizas: require('../assets/modelos/hortalizas.onnx'),
-  cafe: require('../assets/modelos/cafe.onnx'),
-  cacao: require('../assets/modelos/cacao.onnx'),
-  maiz: require('../assets/modelos/maiz.onnx'),
-  citricos: require('../assets/modelos/citricos.onnx'),
+export type NombreModelo = 'router' | 'hortalizas' | 'cafe' | 'cacao' | 'maiz' | 'citricos'
+
+export type FuenteModelo =
+  | { tipo: 'asset'; recurso: number }
+  | { tipo: 'archivo'; ruta: string }
+
+/**
+ * Devuelve el recurso bundled si está en el APK (para compatibilidad).
+ */
+export const archivo = (n: string): number | null => {
+  return MODELOS_INCLUIDOS[n] ?? null
 }
-export type NombreModelo = keyof typeof ARCHIVOS
-export const archivo = (n: NombreModelo) => ARCHIVOS[n]
-// Un modelo que no figura en modelos.json no se usa (aunque quede un .onnx viejo en la carpeta).
+
+/**
+ * Busca primero si el modelo viaja dentro del APK (asset require),
+ * y si no, busca el archivo descargado en documentDirectory/modelos/.
+ */
+export async function obtenerFuenteModelo(n: string): Promise<FuenteModelo | null> {
+  if (MODELOS_INCLUIDOS[n]) {
+    return { tipo: 'asset', recurso: MODELOS_INCLUIDOS[n] }
+  }
+  const ruta = await rutaLocalDescargada(n)
+  if (ruta) {
+    return { tipo: 'archivo', ruta }
+  }
+  return null
+}
+
+/**
+ * Comprueba si el modelo está listo para inferir sin internet.
+ */
+export async function estaModeloInstalado(n: string): Promise<boolean> {
+  return estaGrupoDisponible(n)
+}
+
+// Un modelo que no figura en modelos.json no se usa.
 export const manifest = (n: string) => INFO.modelos.find((m) => m.nombre === n) ?? null

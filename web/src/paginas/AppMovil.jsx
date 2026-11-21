@@ -65,7 +65,11 @@ export default function AppMovil() {
             <div className="am-descarga-txt">
               <p>Escanea el código con la cámara del celular o descarga el archivo directamente.</p>
               {lista ? (
-                <a className="btn" href={APK} download="FitoLens.apk"><Download size={18} />Descargar APK</a>
+                <>
+                  <a className="btn" href={APK} download="FitoLens.apk"><Download size={18} />Descargar APK</a>
+                  <p className="pequeno tenue">Versión liviana: al abrirla eliges tus cultivos y solo se descargan esos modelos.
+                    ¿Sin internet en el campo? <a href="/descargas/FitoLens-completo.apk" download="FitoLens-completo.apk">Descarga el APK completo</a> (todos los cultivos, unos 366 MB).</p>
+                </>
               ) : (
                 <button className="btn" disabled><Download size={18} />Descargar APK</button>
               )}

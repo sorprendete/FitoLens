@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text } from 'react-native'
 import * as Print from 'expo-print'
 import * as Sharing from 'expo-sharing'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
-import { C } from './tema'
+import { useTema } from './tema'
 import { CULTIVOS, esSana, infoClase } from './catalogo'
 import type { Resultado, Vision } from './ia'
 
@@ -73,6 +73,7 @@ function html(r: Resultado, foto: { b64: string; proporcion: number }, vision: V
 }
 
 export default function BotonReporte({ r, foto, vision }: { r: Resultado; foto: string; vision?: Vision | null }) {
+  const { colores: C } = useTema()
   const [estado, setEstado] = useState('')
   if (r.estado !== 'diagnostico') return null
 
@@ -92,15 +93,15 @@ export default function BotonReporte({ r, foto, vision }: { r: Resultado; foto: 
 
   return (
     <>
-      <Pressable onPress={compartir} disabled={estado === 'Generando…'} style={({ pressed }) => [s.boton, (pressed || estado === 'Generando…') && { opacity: 0.6 }]} accessibilityRole="button">
-        <Text style={s.txt}>{estado === 'Generando…' ? 'Generando…' : '📄  Reporte PDF para compartir'}</Text>
+      <Pressable onPress={compartir} disabled={estado === 'Generando…'} style={({ pressed }) => [s.boton, { backgroundColor: C.sup2, borderColor: C.borde2 }, (pressed || estado === 'Generando…') && { opacity: 0.6 }]} accessibilityRole="button">
+        <Text style={[s.txt, { color: C.texto }]}>{estado === 'Generando…' ? 'Generando…' : '📄  Reporte PDF para compartir'}</Text>
       </Pressable>
-      {!!estado && estado !== 'Generando…' && <Text style={{ color: C.coral, fontSize: 13 }}>{estado}</Text>}
+      {!!estado && estado !== 'Generando…' && <Text style={{ color: C.coral, fontSize: 13, marginTop: 4 }}>{estado}</Text>}
     </>
   )
 }
 
 const s = StyleSheet.create({
-  boton: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: C.borde2, alignItems: 'center', justifyContent: 'center', marginTop: 8, backgroundColor: C.sup2 },
-  txt: { color: C.texto, fontWeight: '700', fontSize: 16 },
+  boton: { minHeight: 50, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', marginTop: 8, paddingHorizontal: 14 },
+  txt: { fontWeight: '700', fontSize: 16 },
 })
