@@ -19,6 +19,10 @@ CLASES = {
     ],
     "cafe": ["cafe_sana", "cafe_roya", "cafe_ojo_de_gallo"],
     "cacao": ["cacao_sana", "cacao_monilia", "cacao_mazorca_negra"],
+    "maiz": [
+        "maiz_sana", "maiz_tizon_hoja", "maiz_roya_comun", "maiz_mancha_gris",
+        "maiz_gusano_cogollero",
+    ],
 }
 
 ETIQUETAS = {
@@ -34,10 +38,13 @@ ETIQUETAS = {
     "tomate_virus_mosaico": "Tomate: virus del mosaico", "tomate_sana": "Tomate: sana",
     "cafe_sana": "Café: sana", "cafe_roya": "Café: roya", "cafe_ojo_de_gallo": "Café: ojo de gallo",
     "cacao_sana": "Cacao: sana", "cacao_monilia": "Cacao: moniliasis", "cacao_mazorca_negra": "Cacao: mazorca negra",
+    "maiz_sana": "Maíz: sana", "maiz_tizon_hoja": "Maíz: tizón de la hoja",
+    "maiz_roya_comun": "Maíz: roya común", "maiz_mancha_gris": "Maíz: mancha gris",
+    "maiz_gusano_cogollero": "Maíz: gusano cogollero", "maiz": "Maíz",
 }
 
 ESPECIALISTA_DE_CULTIVO = {"pimiento": "hortalizas", "papa": "hortalizas", "tomate": "hortalizas",
-                           "cafe": "cafe", "cacao": "cacao"}
+                           "cafe": "cafe", "cacao": "cacao", "maiz": "maiz"}
 RECHAZO = ["otra_planta", "no_planta"]
 
 # ---------------------------------------------------------------- fuentes
@@ -85,6 +92,16 @@ FUENTES = {
         tipo="kaggle", ref="serranosebas/enfermedades-cacao-yolov4", campo=True, regla="cacao_yolo",
         recorte_yolo=True, modelos=["cacao", "router"], requerido=False,
         cita="Cocoa Diseases (YOLOv4), Kaggle serranosebas/enfermedades-cacao-yolov4", licencia="ODbL"),
+    "maiz_bd": dict(
+        tipo="mendeley", id="sb4wwjs8bz", version=1, campo=True, regla="maiz",
+        modelos=["maiz", "router"], requerido=False,
+        cita="An Open-Source Multi-Format Maize Leaf Image Dataset, Mendeley Data, 10.17632/sb4wwjs8bz.1",
+        licencia="CC BY 4.0"),
+    "maiz_mld": dict(
+        tipo="mendeley", id="3myfctrgk3", version=1, campo=True, regla="maiz",
+        modelos=["maiz", "router"], requerido=False,
+        cita="MLD: Multi-Class Maize Leaf Disease Image Dataset, Mendeley Data, 10.17632/3myfctrgk3.1",
+        licencia="CC BY 4.0"),
     "no_planta": dict(
         tipo="kaggle", ref="prasunroy/natural-images", campo=True, regla="no_planta",
         modelos=["router"], requerido=True,
@@ -110,6 +127,13 @@ RECETA_POR_MODELO = {
     "router": dict(muestras_por_epoca=16000, epocas=15),
     "cafe": dict(muestras_por_epoca=4000, epocas=30),
     "cacao": dict(muestras_por_epoca=4000, epocas=30),
+    "maiz": dict(
+        muestras_por_epoca=6000,
+        epocas=25,
+        escala_recorte_min=0.60,
+        sobremuestreo={"maiz_gusano_cogollero": 2.5},
+        peso_perdida={"maiz_gusano_cogollero": 2.0},
+    ),
 }
 MIN_FOTOS_CLASE = 30   # una clase con menos fotos de entrenamiento se quita del modelo (y se avisa)
 

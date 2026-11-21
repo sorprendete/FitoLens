@@ -6,7 +6,7 @@ Después de cambiar algo en fitolens_ent/, vuelve a ejecutar:  python entrenamie
 import glob, json, os
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
-MODELOS = ["router", "hortalizas", "cafe", "cacao"]
+MODELOS = ["router", "hortalizas", "cafe", "cacao", "maiz"]
 
 
 def celda(tipo, texto):

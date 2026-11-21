@@ -42,7 +42,7 @@ def wilson(aciertos, n, z=1.96):
     return [round(c - d, 4), round(c + d, 4)]
 
 
-def metricas(p, y, clases, umbral=None):
+def metricas(p, y, clases, umbral=None, modelo=None):
     pred, conf = p.argmax(1), p.max(1)
     K, n = len(clases), len(y)
     mc = np.zeros((K, K), int)
@@ -67,6 +67,12 @@ def metricas(p, y, clases, umbral=None):
              clases_sin_fotos=[c for c in clases if por_clase[c]["n"] == 0])
     if umbral is not None:
         resp = conf >= umbral
+        if modelo == "maiz" and "maiz_gusano_cogollero" in clases and "maiz_tizon_hoja" in clases:
+            i_cog = clases.index("maiz_gusano_cogollero")
+            i_tiz = clases.index("maiz_tizon_hoja")
+            dif = np.abs(p[:, i_cog] - p[:, i_tiz])
+            conflicto = ((pred == i_cog) | (pred == i_tiz)) & (dif < 0.15)
+            resp = resp & (~conflicto)
         r["con_umbral"] = dict(umbral=umbral, cobertura=round(float(resp.mean()), 4),
                                accuracy_respondidas=round(float((pred[resp] == y[resp]).mean()) if resp.any() else 0.0, 4))
     return r
@@ -81,11 +87,17 @@ def elegir_temperatura(logits, y, grupos):
     return round(mejor[1], 2)
 
 
-def elegir_umbral(p, y, objetivo):
+def elegir_umbral(p, y, objetivo, clases=None, modelo=None):
     pred, conf = p.argmax(1), p.max(1)
     opciones = []
+    conflicto = np.zeros(len(y), dtype=bool)
+    if modelo == "maiz" and clases and "maiz_gusano_cogollero" in clases and "maiz_tizon_hoja" in clases:
+        i_cog = clases.index("maiz_gusano_cogollero")
+        i_tiz = clases.index("maiz_tizon_hoja")
+        dif = np.abs(p[:, i_cog] - p[:, i_tiz])
+        conflicto = ((pred == i_cog) | (pred == i_tiz)) & (dif < 0.15)
     for t in np.arange(0.30, 0.96, 0.01):
-        resp = conf >= t
+        resp = (conf >= t) & (~conflicto)
         if resp.mean() < 0.3:
             break
         opciones.append((round(float(t), 2), float((pred[resp] == y[resp]).mean()), float(resp.mean())))
@@ -111,20 +123,28 @@ def predecir(red, cargador, tta=True):
     return torch.cat(L).numpy(), torch.cat(Y).numpy()
 
 
-def entrenar_backbone(backbone, muestras, clases, r, grupos, prueba):
+def entrenar_backbone(backbone, muestras, clases, r, grupos, prueba, modelo=None):
     tr = [m for m in muestras if m["split"] == "train"]
     va = [m for m in muestras if m["split"] == "val"]
     fondos = [m["ruta"] for m in tr if m["campo"]][:3000]
     cuenta = np.bincount([m["y"] for m in tr], minlength=len(clases))
-    pesos = [(1 / math.sqrt(cuenta[m["y"]])) * (r["peso_campo"] if m["campo"] else 1.0) for m in tr]
+    sobremuestreo = r.get("sobremuestreo", {})
+    pesos = [(1 / math.sqrt(cuenta[m["y"]])) * sobremuestreo.get(clases[m["y"]], 1.0)
+             * (r["peso_campo"] if m["campo"] else 1.0) for m in tr]
     nw = min(8, os.cpu_count() or 2)
-    ctr = DataLoader(Conjunto(tr, r["tam"], True, fondos), r["lote"], num_workers=nw, pin_memory=True,
+    escala_min = r.get("escala_recorte_min", 0.35)
+    ctr = DataLoader(Conjunto(tr, r["tam"], True, fondos, escala_min=escala_min, cultivo=modelo),
+                     r["lote"], num_workers=nw, pin_memory=True,
                      sampler=WeightedRandomSampler(pesos, r["muestras_por_epoca"], replacement=True),
                      drop_last=True, persistent_workers=nw > 0)
     cva = DataLoader(Conjunto(va, r["tam"]), r["lote"] * 2, num_workers=nw)
 
     red = FitoNet(backbone, len(clases), preentrenado=not prueba).to(DISP).to(memory_format=torch.channels_last)
-    criterio = nn.CrossEntropyLoss(label_smoothing=r["suavizado"])
+    pesos_perdida = None
+    if "peso_perdida" in r:
+        pesos_perdida = torch.tensor([r["peso_perdida"].get(c, 1.0) for c in clases],
+                                     dtype=torch.float, device=DISP)
+    criterio = nn.CrossEntropyLoss(weight=pesos_perdida, label_smoothing=r["suavizado"])
     escalador = torch.amp.GradScaler(enabled=DISP == "cuda")
 
     def una_epoca(opt, sched=None):
@@ -148,7 +168,7 @@ def entrenar_backbone(backbone, muestras, clases, r, grupos, prueba):
 
     def f1_val():
         l, y = predecir(red, cva, tta=False)
-        return metricas(probabilidades(l, 1.0, grupos, y), y, clases)["f1_macro"]
+        return metricas(probabilidades(l, 1.0, grupos, y), y, clases, modelo=modelo)["f1_macro"]
 
     # fase 1: solo la cabeza
     for p in red.base.parameters():
@@ -244,12 +264,12 @@ def main():
     os.makedirs(tmp, exist_ok=True)
     candidatos = []
     for bb in r["backbones"]:
-        red, f1_sin_tta, cva = entrenar_backbone(bb, muestras, clases, r, grupos, a.prueba)
+        red, f1_sin_tta, cva = entrenar_backbone(bb, muestras, clases, r, grupos, a.prueba, modelo=a.modelo)
         lv, yv = predecir(red, cva, r["tta"])
         T = elegir_temperatura(lv, yv, grupos)
         pv = probabilidades(lv, T, grupos, yv)
-        umbral, alcanzado = elegir_umbral(pv, yv, r["precision_objetivo"])
-        f1v = metricas(pv, yv, clases)["f1_macro"]
+        umbral, alcanzado = elegir_umbral(pv, yv, r["precision_objetivo"], clases=clases, modelo=a.modelo)
+        f1v = metricas(pv, yv, clases, modelo=a.modelo)["f1_macro"]
         ruta = os.path.join(tmp, bb.replace("/", "_") + ".onnx")
         exportar_onnx(copy.deepcopy(red).cpu().float(), ruta, r["tam"], r["tta"])
         lat, dif, cam_hw = latencia_y_paridad(ruta, red, cva, r["tam"])
@@ -269,12 +289,12 @@ def main():
     conj = lambda sp: DataLoader(Conjunto([m for m in muestras if m["split"] == sp], r["tam"]), r["lote"] * 2,
                                  num_workers=min(8, os.cpu_count() or 2))
     lt, yt = predecir(red, conj("test"), r["tta"])
-    campo = metricas(probabilidades(lt, c["T"], grupos, yt), yt, clases, c["umbral"])
-    campo_sin_filtro = metricas(probabilidades(lt, c["T"]), yt, clases) if grupos is not None else None
+    campo = metricas(probabilidades(lt, c["T"], grupos, yt), yt, clases, c["umbral"], modelo=a.modelo)
+    campo_sin_filtro = metricas(probabilidades(lt, c["T"]), yt, clases, modelo=a.modelo) if grupos is not None else None
     lab = None
     if any(m["split"] == "lab_prueba" for m in muestras):
         ll, yl = predecir(red, conj("lab_prueba"), r["tta"])
-        lab = metricas(probabilidades(ll, c["T"], grupos, yl), yl, clases)
+        lab = metricas(probabilidades(ll, c["T"], grupos, yl), yl, clases, modelo=a.modelo)
     log(f"PRUEBA DE CAMPO: n={campo['n']} accuracy={campo['accuracy']} IC95={campo['accuracy_ic95']} "
         f"f1_macro={campo['f1_macro']} | con umbral {c['umbral']}: {campo['con_umbral']}")
 
@@ -299,6 +319,13 @@ def main():
     if a.modelo == "router":
         manifest["rechazo"] = catalogo.RECHAZO
         manifest["especialistas"] = catalogo.ESPECIALISTA_DE_CULTIVO
+    if a.modelo == "maiz":
+        manifest["regla_no_seguro"] = dict(
+            par=["maiz_gusano_cogollero", "maiz_tizon_hoja"],
+            margen_minimo=0.15,
+            resultado="no_concluyente",
+            motivo="Ambigüedad entre daño de gusano cogollero y tizón foliar",
+        )
     metr = dict(
         modelo=a.modelo, version=a.version, backbone=c["backbone"],
         campo=campo, laboratorio=dict(accuracy=lab["accuracy"], n=lab["n"]) if lab else None,

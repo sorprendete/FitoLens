@@ -9,7 +9,7 @@ El resumen "carpeta -> etiqueta" se imprime al preparar los datos para poder rev
 """
 import re
 
-CULTIVOS = ("pimiento", "papa", "tomate", "cafe", "cacao")
+CULTIVOS = ("pimiento", "papa", "tomate", "cafe", "cacao", "maiz")
 
 
 def _norm(s):
@@ -23,6 +23,8 @@ def _cultivo(s):
         return "papa"
     if re.search(r"tomato|tomate", s):
         return "tomate"
+    if re.search(r"maiz|corn|maize|zea", s):
+        return "maiz"
     return None
 
 
@@ -122,6 +124,46 @@ def no_planta(carpeta, cfg):
     if re.search(r"airplane|car|cat|dog|motorbike|person", s):
         return "no_planta"
     return None
+
+
+def maiz(carpeta, cfg):
+    s = _norm(carpeta)
+    if re.search(r"healthy|sana|sano|saludable", s):
+        return "maiz_sana"
+    if re.search(r"fall\s*armyworm|armyworm|spodoptera|cogollero|gusano", s):
+        return "maiz_gusano_cogollero"
+    if re.search(r"blight|tizon|turcicum|exserohilum", s):
+        return "maiz_tizon_hoja"
+    if re.search(r"rust|roya|puccinia", s):
+        return "maiz_roya_comun"
+    if re.search(r"gray\s*leaf|grey\s*leaf|cercospora|mancha\s*gris", s):
+        return "maiz_mancha_gris"
+    return "maiz"
+
+
+# ------------------------------------------------------------ certeza y regla no seguro
+MARGEN_MIN_MAIZ = 0.15
+PAR_CONFLICTO_MAIZ = ("maiz_gusano_cogollero", "maiz_tizon_hoja")
+
+
+def es_diagnostico_seguro(clase_predicha, p_vector, clases, umbral=0.5, margen_maiz=MARGEN_MIN_MAIZ):
+    """Evalúa si una predicción es concluyente o debe marcarse como 'no seguro'.
+
+    Para maíz: si la clase ganadora es 'maiz_gusano_cogollero' o 'maiz_tizon_hoja' y la
+    diferencia de probabilidades entre ambas es menor a margen_maiz (0.15), el resultado
+    se considera no concluyente por ambigüedad morfológica (daño mecánico/huecos vs necrosis).
+    Para otros cultivos o clases: rige únicamente el umbral de confianza mínimo.
+    """
+    conf = float(p_vector.max())
+    if conf < umbral:
+        return False, "confianza_insuficiente"
+    if clase_predicha in PAR_CONFLICTO_MAIZ and all(c in clases for c in PAR_CONFLICTO_MAIZ):
+        i_cog = clases.index("maiz_gusano_cogollero")
+        i_tiz = clases.index("maiz_tizon_hoja")
+        dif = abs(float(p_vector[i_cog]) - float(p_vector[i_tiz]))
+        if dif < margen_maiz:
+            return False, "ambiguedad_cogollero_tizon"
+    return True, None
 
 
 def etiqueta_para_modelo(etiqueta, modelo, clases):
