@@ -3,7 +3,7 @@
     "name": "FitoLens",
     "slug": "fitolens",
     "scheme": "fitolens",
-    "version": "2.2.2",
+    "version": "2.2.3",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
