@@ -1,5 +1,8 @@
 """Pruebas de las reglas de ambigüedad de maíz (probabilidades y detección de huecos de gusano cogollero)."""
+from pathlib import Path
+
 import numpy as np
+from PIL import Image, ImageDraw
 
 from app.ia.pipeline import MOTIVO_HUECOS_MAIZ, MOTIVO_MAIZ_AMBIGUO
 from app.ia.registro import cargar
@@ -178,13 +181,22 @@ def test_huecos_mordedura_filtros_unitarios():
     assert 0.039 <= r4["fraccion"] <= 0.041
     assert r4["fuerte"] is True
 
-    # 4. 1 hueco grande (26x26 = 676 px = 6.76 % >= 6 %) -> fuerte
+    # 4. 1 hueco grande (26x26 = 676 px = 6.76 %): con el nuevo umbral exige al menos 2 huecos para fraccion >= 3 %, así que no es fuerte
     mg = base.copy()
     mg[70:96, 70:96] = False
     rg = huecos_mordedura(mg)
     assert rg["cantidad"] == 1
     assert rg["fraccion"] >= 0.06
-    assert rg["fuerte"] is True
+    assert rg["fuerte"] is False
+
+    # 4b. 2 huecos que suman >= 3 % del área -> fuerte
+    m2 = base.copy()
+    m2[70:90, 70:90] = False     # 400 px = 4 %
+    m2[110:125, 110:125] = False # 225 px = 2.25 %
+    r2 = huecos_mordedura(m2)
+    assert r2["cantidad"] == 2
+    assert r2["fraccion"] >= 0.03
+    assert r2["fuerte"] is True
 
     # 5. Componente alargado (70x5, aspecto 14 > 6) -> descartado
     ma = base.copy()
@@ -200,9 +212,9 @@ def test_huecos_mordedura_filtros_unitarios():
     assert rb["cantidad"] == 0
     assert rb["fuerte"] is False
 
-    # 7. Ruido muy pequeño (< 0.05 % = 5 px) -> descartado
+    # 7. Ruido muy pequeño (< 0.04 % = 4 px) -> descartado
     mr = base.copy()
-    mr[80:82, 80:82] = False  # 4 px < 5 px
+    mr[80:81, 80:83] = False  # 3 px < 4 px
     rr = huecos_mordedura(mr)
     assert rr["cantidad"] == 0
     assert rr["fuerte"] is False
@@ -219,3 +231,85 @@ def test_huecos_mordedura_filtros_unitarios():
     # 9. Entrada inválida
     assert huecos_mordedura(None) == {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
     assert huecos_mordedura(np.zeros((10, 10), bool)) == {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+
+
+def test_huecos_mordedura_con_imagen_y_color():
+    """Detecta huecos por color dentro de una silueta sólida cuando la imagen tiene huecos de fondo."""
+    # Máscara sólida (sin huecos geométricos en la máscara)
+    mascara = np.zeros((192, 192), dtype=bool)
+    mascara[30:160, 30:160] = True
+
+    # Imagen con hoja verde (70, 140, 50 con ruido) y 4 huecos de color suelo oscuro (60, 45, 30)
+    rng = np.random.default_rng(42)
+    arr = np.full((300, 300, 3), 225, dtype=np.uint8)
+    ruido = rng.integers(-5, 6, size=(200, 200, 3), dtype=np.int16)
+    arr[50:250, 50:250] = np.clip(np.array([70, 140, 50], dtype=np.int16) + ruido, 0, 255).astype(np.uint8)
+
+    # 4 huecos de 1 % del área de la hoja (20x20 = 400 px de 40000 px), separados y lejos del borde
+    for y, x in [(80, 80), (80, 190), (190, 80), (190, 190)]:
+        arr[y:y + 20, x:x + 20] = (60, 45, 30)
+
+    img = Image.fromarray(arr)
+
+    res = huecos_mordedura(mascara, imagen=img)
+    assert res["cantidad"] == 4
+    assert res["fraccion"] >= 0.02
+    assert res["fuerte"] is True
+
+
+def test_tizon_manchas_marrones_no_se_marcan_como_huecos():
+    """Manchas marrones de tizón (120, 80, 30) deben reconocerse como tejido vegetal y no como huecos."""
+    mascara = np.zeros((192, 192), dtype=bool)
+    mascara[30:160, 30:160] = True
+
+    img = Image.new("RGB", (300, 300), (225, 225, 225))
+    draw = ImageDraw.Draw(img)
+    draw.rectangle([50, 50, 250, 250], fill=(45, 140, 45))
+    # Manchas de tizón (color marrón necrótico típico)
+    draw.rectangle([80, 80, 130, 130], fill=(120, 80, 30))
+    draw.rectangle([170, 170, 210, 210], fill=(130, 85, 35))
+
+    res = huecos_mordedura(mascara, imagen=img)
+    assert res["cantidad"] == 0
+    assert res["fraccion"] == 0.0
+    assert res["fuerte"] is False
+
+
+def test_ronald_huecos_foto_real_si_existe():
+    """La foto real ronald_huecos.jpg debe detectarse como daño fuerte de cogollero."""
+    raiz = Path(__file__).resolve().parents[1]
+    ruta_ronald = raiz / "pruebas" / "huecos" / "fotos" / "maiz_gusano_cogollero" / "ronald_huecos.jpg"
+    if not ruta_ronald.exists():
+        return
+    img = Image.open(ruta_ronald).convert("RGB")
+    # Silueta que cubre la zona central de la hoja
+    m = np.zeros((192, 192), dtype=bool)
+    m[10:182, 40:152] = True
+    res = huecos_mordedura(m, imagen=img)
+    assert res["cantidad"] >= 4
+    assert res["fraccion"] >= 0.008
+    assert res["fuerte"] is True
+
+
+def test_mancha_gris_con_huecos_fuertes_no_cambia_a_cogollero(cliente, tmp_path):
+    """La clase maiz_mancha_gris no debe cambiar a cogollero aunque haya huecos fuertes."""
+    crear_modelos_falsos.crear_todos(tmp_path, cultivo_router="maiz")
+    crear_modelos_falsos.crear(tmp_path, "maiz", favorita="maiz_mancha_gris")
+    cliente.app.state.registro = cargar(tmp_path, 1, segmentar=False)
+
+    # Máscara con 4 huecos encerrados (daño fuerte)
+    m = np.zeros((192, 192), dtype=bool)
+    m[40:140, 40:140] = True
+    m[55:65, 55:65] = False
+    m[55:65, 115:125] = False
+    m[115:125, 55:65] = False
+    m[115:125, 115:125] = False
+    cliente.app.state.registro.segmentador = SegmentadorMock(m)
+
+    r = cliente.post("/api/diagnostico", files={"imagen": ("hoja.jpg", foto(), "image/jpeg")})
+    assert r.status_code == 200, r.text
+    d = r.json()
+    assert d["estado"] == "diagnostico"
+    assert d["cultivo"] == "maiz"
+    assert d["clase"] == "maiz_mancha_gris"
+    assert d["motivo"] is None
