@@ -25,8 +25,8 @@
 
 /* ---------- 2. Base ---------- */
 * { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; min-height: 100dvh; font: 15px/1.55 'Inter Variable', system-ui, sans-serif; color: var(--texto); background: var(--fondo); }
+html { -webkit-text-size-adjust: 100%; overflow-x: hidden; }
+body { margin: 0; min-height: 100dvh; font: 15px/1.55 'Inter Variable', system-ui, sans-serif; color: var(--texto); background: var(--fondo); overflow-x: hidden; overflow-wrap: anywhere; word-break: break-word; }
 body::before { /* fondo vivo: brillos + rejilla tenue */
   content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none;
   background:
@@ -85,7 +85,7 @@ select { padding: 0 12px; cursor: pointer; }
 .segmentado button[aria-pressed='true'] { background: var(--sup); color: var(--texto); box-shadow: var(--sombra), inset 0 0 0 1px var(--borde-2); }
 .barra-filtros, .filtros, .acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .acciones { margin: 18px 0; }
-.buscador { flex: 1; min-width: 220px; }
+.buscador { flex: 1; min-width: min(220px, 100%); }
 
 /* ---------- 4. Superficies ---------- */
 .tarjeta { position: relative; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 22px; box-shadow: var(--sombra); animation: subir .3s ease both; }
@@ -170,7 +170,7 @@ select { padding: 0 12px; cursor: pointer; }
 }
 
 /* ---------- 6. Acceso (login y registro) ---------- */
-.acceso { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(380px, .85fr); min-height: 100dvh; }
+.acceso { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(min(380px, 100%), .85fr); min-height: 100dvh; }
 .heroe { position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 28px; padding: 36px 56px; color: #eef2fb;
   background: radial-gradient(900px 600px at 20% 0%, #312e81, transparent 60%), radial-gradient(700px 500px at 100% 100%, #0e7490aa, transparent 60%), #070b1a; }
 .heroe .logo small { color: #a5b0cc; }
@@ -204,7 +204,7 @@ select { padding: 0 12px; cursor: pointer; }
 @keyframes tarjeta { 0%, 45% { opacity: 0; transform: translateY(8px); } 55%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
 .escaneo-tarjeta small { color: #a5b0cc; font-size: .72rem; } .escaneo-tarjeta b { font-family: var(--titulos); font-size: 1.1rem; color: #fca5a5; }
 .mini-barra { height: 6px; border-radius: 9px; background: #ffffff1a; overflow: hidden; } .mini-barra i { display: block; height: 100%; width: 92%; background: linear-gradient(90deg, #22d3ee, #a78bfa); }
-.heroe-cifras { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid #ffffff1f; border-radius: 18px; background: #ffffff08; backdrop-filter: blur(6px); }
+.heroe-cifras { position: relative; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #ffffff1f; border-radius: 18px; background: #ffffff08; backdrop-filter: blur(6px); }
 .heroe-cifras div { padding: 16px 20px; } .heroe-cifras div + div { border-left: 1px solid #ffffff1f; }
 .heroe-cifras b { display: block; font: 700 1.8rem/1.1 var(--titulos); color: #fff; } .heroe-cifras span { color: #a5b0cc; font-size: .82rem; }
 .acceso-lado { position: relative; display: grid; place-items: center; padding: 40px 24px; }
@@ -239,7 +239,7 @@ select { padding: 0 12px; cursor: pointer; }
 @keyframes crecer { from { transform: scaleY(0); } }
 @media (max-width: 600px) { .col:nth-child(odd) small { visibility: hidden; } }
 .ranking { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-.ranking li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; font-size: .9rem; }
+.ranking li { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: .9rem; }
 .rk-pista { height: 10px; border-radius: 9px; background: var(--fondo-2); overflow: hidden; }
 .rk-pista i { display: block; height: 100%; border-radius: 9px; background: var(--acento); animation: llenar .9s ease both; }
 .ranking b { font-variant-numeric: tabular-nums; } .ranking small { color: var(--tenue); font-weight: 500; }
@@ -360,7 +360,7 @@ select { padding: 0 12px; cursor: pointer; }
 .flujo p { color: var(--tenue); margin: 0; font-size: .92rem; }
 .flujo-icono { display: grid; place-items: center; width: 50px; height: 50px; border-radius: 15px; margin-bottom: 14px; background: linear-gradient(135deg, var(--acento), var(--acento-2)); color: var(--sobre-acento); box-shadow: var(--brillo); }
 .explica-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 20px; }
-.casos { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 16px 0; }
+.casos { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin: 16px 0; }
 .caso { aspect-ratio: 1; display: grid; place-items: center; border-radius: 12px; font-weight: 800; transition: all .25s; }
 .caso.bien { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); box-shadow: inset 0 0 0 2px var(--ok); }
 .caso.falla { background: color-mix(in srgb, var(--mal) 16%, transparent); color: var(--mal); box-shadow: inset 0 0 0 2px var(--mal); }
@@ -548,7 +548,7 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 .veredicto { padding: 14px 16px; border-radius: 16px; border: 2px solid; gap: 14px; }
 .veredicto.es-sana { color: var(--ok); background: color-mix(in srgb, var(--ok) 10%, transparent); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
 .veredicto.es-enferma { color: var(--mal); background: color-mix(in srgb, var(--mal) 10%, transparent); border-color: color-mix(in srgb, var(--mal) 45%, transparent); }
-.veredicto > div:first-of-type { flex: 1; min-width: 180px; }
+.veredicto > div:first-of-type { flex: 1; min-width: 0; }
 .veredicto h2 { color: var(--texto); font-size: clamp(1.6rem, 3vw, 2rem); font-weight: 800; }
 .veredicto .cientifico { color: var(--texto); opacity: .75; font-size: .95rem; }
 .veredicto-conf { text-align: center; } .veredicto-conf b { display: block; font: 800 1.8rem/1 var(--titulos); color: var(--texto); }
@@ -601,3 +601,89 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
 /* Contorno de la hoja detectada (segmentación): línea fina, visible en ambos modos */
 .marco .contorno-hoja { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .contorno-hoja polygon { fill: none; stroke: #fff; stroke-width: 1.5; stroke-dasharray: 6 4; stroke-linejoin: round; filter: drop-shadow(0 0 1px rgba(0,0,0,.8)); }
+
+/* ---------- 19. Responsive móvil (320 – 640 px) ----------
+   Red de seguridad: overflow-x: hidden ya está en html/body (sección 2).
+   Aquí se corrigen las causas: grids con columnas fijas, anchos mínimos y
+   elementos que empujan el layout más allá del viewport. */
+@media (max-width: 640px) {
+  /* Contenedor principal: sin padding lateral excesivo */
+  .pagina { padding: 16px 12px 110px; }
+  .superior { padding: 10px 12px; }
+
+  /* Grids de varias columnas → una sola columna */
+  .rejilla-2,
+  .rejilla-2.ancha-izq,
+  .rejilla-3,
+  .brotes-grid,
+  .diag-grid,
+  .portada,
+  .explica-grid,
+  .modelos-grid { grid-template-columns: 1fr !important; }
+
+  /* Tarjeta destacada (parcelas): apilar verticalmente */
+  .tarjeta.destacada { flex-direction: column; align-items: flex-start; }
+
+  /* Acciones/botones: que no desborden */
+  .acciones { flex-wrap: wrap; }
+
+  /* Barra de filtros: buscador ocupa todo el ancho */
+  .barra-filtros { flex-wrap: wrap; }
+  .buscador { min-width: 0; width: 100%; }
+
+  /* Encabezado de página: apilar */
+  .encabezado { flex-direction: column; align-items: flex-start; }
+
+  /* Segmentado (periodo): que se adapte */
+  .segmentado { flex-wrap: wrap; width: 100%; }
+  .segmentado button { flex: 1; }
+
+  /* Tarjeta de bienvenida */
+  .bienvenida { flex-direction: column; }
+
+  /* Veredicto del diagnóstico: apilar icono + texto */
+  .veredicto { flex-wrap: wrap; }
+  .veredicto-conf { width: 100%; text-align: left; }
+
+  /* Donor chart: apilar dona + leyenda */
+  .dona { flex-direction: column; align-items: flex-start; }
+  .dona svg { width: 140px; }
+
+  /* Ranking: reducir gap para que no desborde */
+  .ranking li { gap: 6px; font-size: .82rem; }
+
+  /* Casos (umbral interactivo): menos columnas */
+  .casos { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+  /* Tabla de confusión: scroll horizontal dentro de su contenedor */
+  .matriz { overflow-x: auto; }
+
+  /* Heroe cifras (login): ocultar ya lo hace la media 860px, aquí ok */
+
+  /* Imagen del diagnóstico: nunca más ancha que el viewport */
+  .marco img { max-width: 100%; }
+
+  /* Textos con URL o palabras largas */
+  .tarjeta, .alerta, .consejo, .resultado { overflow-wrap: anywhere; word-break: break-word; }
+
+  /* Pie de página: separación del nav móvil */
+  .pie { padding-bottom: 110px; }
+
+  /* KPI: 2 columnas ajustadas */
+  .rejilla-kpi { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kpi b { font-size: 1.5rem; }
+
+  /* Ubicación (selects de provincia): que se envuelvan */
+  .ubicacion { flex-wrap: wrap; }
+  .ubicacion select { width: 100%; min-width: 0; }
+
+  /* Chip de cultivo: no desbordar */
+  .chip-cultivo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* Heroe login: columna única ya la gestiona la media 860, pero asegurar 0 padding lateral */
+  .heroe { padding: 20px 12px; }
+  .acceso-lado { padding: 20px 12px 32px; }
+
+  /* Formulario de acceso: ancho completo */
+  .acceso-form { width: 100%; max-width: 100%; }
+}

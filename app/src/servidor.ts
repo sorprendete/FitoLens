@@ -2,6 +2,7 @@
 import Constants from 'expo-constants'
 import * as Network from 'expo-network'
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator'
+import { File } from 'expo-file-system'
 import type { Resultado } from './ia'
 import { tokenActual } from './cuenta'
 
@@ -17,6 +18,16 @@ const cabecera = (): Record<string, string> => { const t = tokenActual(); return
 // Error del servidor con su código, para decidir si reintentar más tarde.
 export class ErrorServidor extends Error { constructor(public codigo: number, mensaje: string) { super(mensaje) } }
 
+// Adjunta la foto al FormData usando File de expo-file-system, que expo/fetch acepta como Blob.
+function adjuntarFoto(f: FormData, uri: string) {
+  try {
+    const archivo = new File(uri)
+    f.append('imagen', archivo as any, 'foto.jpg')
+  } catch {
+    throw new Error('No se pudo leer la foto.')
+  }
+}
+
 async function pedir(ruta: string, cuerpo: FormData, ms = 20000) {
   const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ms)
   try {
@@ -30,7 +41,7 @@ async function pedir(ruta: string, cuerpo: FormData, ms = 20000) {
 // Envía la foto a POST /api/diagnostico: el servidor la registra (mapa de brotes) y devuelve su diagnóstico.
 export async function enviar(uri: string, provincia?: string | null): Promise<Resultado> {
   const f = new FormData()
-  f.append('imagen', { uri, name: 'foto.jpg', type: 'image/jpeg' } as any)
+  adjuntarFoto(f, uri)
   f.append('origen', 'app')
   if (provincia) f.append('provincia', provincia)
   const d = await pedir('/api/diagnostico', f)
@@ -52,7 +63,7 @@ export type Pendiente = { id_cliente: string; foto: string; fecha: string; provi
 // Reenviar el mismo id_cliente no lo duplica en el servidor.
 export async function subir(p: Pendiente): Promise<number> {
   const f = new FormData()
-  f.append('imagen', { uri: await reducir(p.foto), name: 'foto.jpg', type: 'image/jpeg' } as any)
+  adjuntarFoto(f, await reducir(p.foto))
   f.append('id_cliente', p.id_cliente)
   f.append('estado', p.r.estado)
   f.append('fecha', p.fecha)

@@ -36,6 +36,23 @@ if ($t -notmatch 'buildStagingDirectory') {
   $t = $t -replace '(ndkVersion rootProject\.ext\.ndkVersion)', "`$1`n    externalNativeBuild { cmake { buildStagingDirectory = file('C:/c') } }"
   [IO.File]::WriteAllText($g, $t)
 }
+# onnxruntime-react-native trae un unimodule.json viejo y el autolinking de Expo NO lo enlaza:
+# sin esto el APK sale sin ONNX Runtime y la app cae a "IA en el servidor" (sin diagnostico offline).
+$st = (Resolve-Path 'android\settings.gradle').Path; $sc = [IO.File]::ReadAllText($st)
+if ($sc -notmatch 'onnxruntime-react-native') {
+  [IO.File]::WriteAllText($st, $sc + "`ninclude ':onnxruntime-react-native'`nproject(':onnxruntime-react-native').projectDir = new File(rootDir, '../node_modules/onnxruntime-react-native/android')`n")
+}
+$t = [IO.File]::ReadAllText($g)
+if ($t -notmatch "project\(':onnxruntime-react-native'\)") {
+  $t = $t -replace '(dependencies \{)', "`$1`n    implementation project(':onnxruntime-react-native')"
+  [IO.File]::WriteAllText($g, $t)
+}
+$ma = (Get-ChildItem 'android\app\src\main' -Recurse -Filter MainApplication.kt | Select-Object -First 1).FullName; $mc = [IO.File]::ReadAllText($ma)
+if ($mc -notmatch 'OnnxruntimePackage') {
+  $mc = $mc -replace '// add\(MyReactNativePackage\(\)\)', 'add(ai.onnxruntime.reactnative.OnnxruntimePackage())'
+  [IO.File]::WriteAllText($ma, $mc)
+  if ($mc -notmatch 'OnnxruntimePackage') { throw 'No se pudo registrar OnnxruntimePackage en MainApplication' }
+}
 # onnxruntime-react-native usa VersionNumber, que Gradle 9 ya no tiene; esa rama solo aplica a RN < 0.71.
 $ort = (Resolve-Path 'node_modules\onnxruntime-react-native\android\build.gradle').Path
 $o = [IO.File]::ReadAllText($ort)
@@ -44,7 +61,7 @@ Set-Content android\local.properties ("sdk.dir=" + ($env:ANDROID_HOME -replace '
 $props = Get-Content $firma | Where-Object { $_ -match '^FITOLENS_' } | ForEach-Object { "-P$_" }
 # versionCode = numero de compilacion (sube solo): minutos desde 2026
 $codigo = [int]((Get-Date) - (Get-Date '2026-01-01')).TotalMinutes
-$args = @('assembleRelease', '--no-daemon', "-PversionCodeOverride=$codigo", '-PreactNativeArchitectures=arm64-v8a') + $props
+$args = @('assembleRelease', '--no-daemon', "-PversionCodeOverride=$codigo", "-PreactNativeArchitectures=$(if ($env:FITOLENS_ABIS) { $env:FITOLENS_ABIS } else { 'arm64-v8a' })") + $props
 Push-Location android
 .\gradlew.bat @args
 $ok = $LASTEXITCODE
