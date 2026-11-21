@@ -185,8 +185,8 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     # 4. Dónde está la hoja (calculado en paralelo)
     hoja = _hoja(r, tarea, reloj)
     # Detección de daño por mordedura (huecos de gusano cogollero) para maíz:
-    if regla_huecos and cultivo == "maiz" and hoja is not None and hoja.mascara is not None:
-        mordedura = huecos_mordedura(hoja.mascara)
+    if regla_huecos and cultivo == "maiz" and clase.id in PAR_CONFLICTO_MAIZ and hoja is not None and hoja.mascara is not None:
+        mordedura = huecos_mordedura(hoja.mascara, imagen=imagen)
         if mordedura["fuerte"]:
             idx_cogollero = next((idx for idx in indices if em.clases[idx].id == "maiz_gusano_cogollero"), None)
             p_cogollero = 0.0

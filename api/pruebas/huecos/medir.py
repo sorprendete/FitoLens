@@ -14,6 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageOps
+import numpy as np
+from scipy import ndimage
 
 AQUI = Path(__file__).resolve().parent
 RAIZ_API = AQUI.parents[1]
@@ -40,11 +42,12 @@ def _generar_fotos_muestra(carpeta_fotos: Path) -> None:
     d1.ellipse([165, 170, 195, 200], fill=(225, 225, 225))
     img1.save(carpeta_fotos / "maiz_gusano_cogollero" / "cogollero_4_huecos.jpg", quality=90)
 
-    # 2. Cogollero: hoja con 1 hueco grande (> 6 % del área)
+    # 2. Cogollero: hoja con 2 huecos medianos/grandes (>= 3 % del área)
     img2 = Image.new("RGB", (300, 300), (225, 225, 225))
     d2 = ImageDraw.Draw(img2)
     d2.ellipse([50, 40, 250, 260], fill=(45, 140, 45))
-    d2.ellipse([110, 110, 190, 190], fill=(225, 225, 225))
+    d2.ellipse([100, 90, 150, 140], fill=(225, 225, 225))
+    d2.ellipse([150, 160, 200, 210], fill=(225, 225, 225))
     img2.save(carpeta_fotos / "maiz_gusano_cogollero" / "cogollero_hueco_grande.jpg", quality=90)
 
     # 3. Tizón: hoja con manchas marrones secas (sin huecos)
@@ -70,7 +73,11 @@ def _generar_fotos_muestra(carpeta_fotos: Path) -> None:
 
 
 def main():
+    guardar_depuracion = "--guardar" in sys.argv
     carpeta_fotos = AQUI / "fotos"
+    carpeta_dep = AQUI / "depuracion"
+    if guardar_depuracion:
+        carpeta_dep.mkdir(parents=True, exist_ok=True)
     fotos = sorted(carpeta_fotos.glob("*/*.jpg"))
 
     if not fotos:
@@ -146,7 +153,7 @@ def main():
             r_con = diagnosticar(registro, img, regla_huecos=True)
 
             seg = registro.segmentador.segmentar(img) if registro.segmentador else None
-            mord = huecos_mordedura(seg.mascara) if (seg and seg.ok and seg.mascara is not None) else {
+            mord = huecos_mordedura(seg.mascara, imagen=img, depuracion=guardar_depuracion) if (seg and seg.ok and seg.mascara is not None) else {
                 "cantidad": 0, "fraccion": 0.0, "fuerte": False
             }
 
@@ -159,11 +166,28 @@ def main():
                 total_cambios += 1
         else:
             seg = segmentador.segmentar(img) if segmentador else None
-            mord = huecos_mordedura(seg.mascara) if (seg and seg.ok and seg.mascara is not None) else {
+            mord = huecos_mordedura(seg.mascara, imagen=img, depuracion=guardar_depuracion) if (seg and seg.ok and seg.mascara is not None) else {
                 "cantidad": 0, "fraccion": 0.0, "fuerte": False
             }
             sin_str = "N/A (sin modelos)"
             con_str = "N/A (sin modelos)"
+
+        if guardar_depuracion:
+            img_512 = img.resize((512, 512), Image.BILINEAR).convert("RGBA")
+            arr_overlay = np.zeros((512, 512, 4), dtype=np.uint8)
+            silueta = mord.get("silueta")
+            if silueta is not None and np.any(silueta):
+                borde_sil = silueta ^ ndimage.binary_erosion(silueta, iterations=2)
+                arr_overlay[borde_sil] = [0, 255, 0, 255]
+            mascara_h = mord.get("mascara_huecos")
+            if mascara_h is not None and np.any(mascara_h):
+                arr_overlay[mascara_h] = [255, 0, 0, 160]
+                borde_h = mascara_h ^ ndimage.binary_erosion(mascara_h, iterations=1)
+                arr_overlay[borde_h] = [255, 0, 0, 255]
+            overlay = Image.fromarray(arr_overlay, "RGBA")
+            img_final = Image.alpha_composite(img_512, overlay).convert("RGB")
+            ruta_salida = carpeta_dep / f"{ruta.stem}.png"
+            img_final.save(ruta_salida)
 
         fuerte_str = "SÍ" if mord["fuerte"] else "no"
         huecos_str = f"cant={mord['cantidad']}, frac={mord['fraccion']:.1%}, fuerte={fuerte_str}"

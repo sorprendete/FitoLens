@@ -13,15 +13,18 @@ const SOLIDEZ_MIN: Record<string, number> = { cacao: 0.75 }
 const MAX_POLIGONOS = 5, MAX_PUNTOS = 120
 
 // Umbrales para detección de huecos de gusano cogollero en maíz
-export const UMBRAL_HUECO_RUIDO_FRAC = 0.0005 // Descarta componentes < 0.05 % del área de la hoja
+export const LADO_HUECOS = 512
+export const UMBRAL_HUECO_RUIDO_FRAC = 0.0004 // Descarta componentes < 0.04 % del área de la hoja
 export const UMBRAL_HUECO_ASPECTO_MAX = 6.0 // Descarta componentes alargados (relación de aspecto > 6)
 export const UMBRAL_HUECO_SOLIDEZ_MIN = 0.4 // Descarta componentes no convexos / hendiduras (solidez < 0.4)
 export const UMBRAL_HUECO_BORDE_PCT = 0.02 // Margen del contorno exterior (2 % del lado de la imagen)
 
-export const HUECOS_FUERTE_MIN_CANTIDAD = 3
-export const HUECOS_FUERTE_MIN_FRACCION = 0.02
-export const HUECOS_FUERTE_GRANDE_CANTIDAD = 1
-export const HUECOS_FUERTE_GRANDE_FRACCION = 0.06
+export const HUECOS_FUERTE_MIN_CANTIDAD = 4
+export const HUECOS_FUERTE_MIN_FRACCION = 0.008
+export const HUECOS_FUERTE_MODERADO_CANTIDAD = 2
+export const HUECOS_FUERTE_MODERADO_FRACCION = 0.03
+export const HUECOS_FUERTE_GRANDE_CANTIDAD = HUECOS_FUERTE_MODERADO_CANTIDAD
+export const HUECOS_FUERTE_GRANDE_FRACCION = HUECOS_FUERTE_MODERADO_FRACCION
 
 export type ResultadoHuecos = { cantidad: number; fraccion: number; fuerte: boolean }
 
@@ -227,28 +230,277 @@ function areaCasco(pts: Punto[]): number {
   return areaPoligono(casco)
 }
 
+function rgbALab(r: number, g: number, b: number): [number, number, number] {
+  const cr = Math.min(1, Math.max(0, r)), cg = Math.min(1, Math.max(0, g)), cb = Math.min(1, Math.max(0, b))
+  const fLin = (c: number) => (c > 0.04045 ? Math.pow((c + 0.055) / 1.055, 2.4) : c / 12.92)
+  const rl = fLin(cr), gl = fLin(cg), bl = fLin(cb)
+  const x = (rl * 0.4124564 + gl * 0.3575761 + bl * 0.1804375) / 0.95047
+  const y = rl * 0.2126729 + gl * 0.7151522 + bl * 0.0721750
+  const z = (rl * 0.0193339 + gl * 0.1191920 + bl * 0.9503041) / 1.08883
+  const delta = 6 / 29, delta3 = delta * delta * delta
+  const f = (t: number) => (t > delta3 ? Math.cbrt(t) : t / (3 * delta * delta) + 4 / 29)
+  const fx = f(x), fy = f(y), fz = f(z)
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)]
+}
+
+function rgbAHsv(r: number, g: number, b: number): [number, number, number] {
+  const cr = Math.min(1, Math.max(0, r)), cg = Math.min(1, Math.max(0, g)), cb = Math.min(1, Math.max(0, b))
+  const mx = Math.max(cr, cg, cb), mn = Math.min(cr, cg, cb), df = mx - mn
+  let h = 0
+  if (df > 1e-6) {
+    if (mx === cr) h = ((60 * ((cg - cb) / df) + 360) % 360)
+    else if (mx === cg) h = 60 * ((cb - cr) / df) + 120
+    else h = 60 * ((cr - cg) / df) + 240
+  }
+  const s = mx > 1e-6 ? df / mx : 0
+  return [h, s, mx]
+}
+
+function esTejidoHoja(r: number, g: number, b: number, h: number, s: number, v: number): boolean {
+  if ((h >= 55 && h <= 175 && s >= 0.12 && v >= 0.10) || (g >= r * 0.95 && g >= b * 1.02 && g >= 0.12)) return true
+  if ((h >= 40 && h < 55 && s >= 0.10 && v >= 0.30) || (g >= r * 0.90 && g >= b * 0.95 && v >= 0.50)) return true
+  if (h >= 15 && h <= 45 && s >= 0.40 && r > g && (r - b) >= 0.15 && v >= 0.15 && v <= 0.75) return true
+  return false
+}
+
+function esVerde(r: number, g: number, b: number, h: number, s: number, v: number): boolean {
+  return (h >= 55 && h <= 175 && s >= 0.12 && v >= 0.10) || (g >= r * 0.95 && g >= b * 1.02 && g >= 0.12)
+}
+
+function mediana(arr: number[]): number {
+  if (arr.length === 0) return 0
+  const copia = [...arr].sort((a, b) => a - b)
+  const mitad = Math.floor(copia.length / 2)
+  return copia.length % 2 !== 0 ? copia[mitad] : (copia[mitad - 1] + copia[mitad]) / 2
+}
+
+function erosionar(m: Uint8Array, n: number, veces: number): Uint8Array {
+  let a = m
+  for (let t = 0; t < veces; t++) {
+    const b = new Uint8Array(n * n)
+    for (let y = 1; y < n - 1; y++) {
+      for (let x = 1; x < n - 1; x++) {
+        const i = y * n + x
+        if (a[i] && a[i - 1] && a[i + 1] && a[i - n] && a[i + n]) {
+          b[i] = 1
+        }
+      }
+    }
+    a = b
+  }
+  return a
+}
+
+function dilatar8(m: Uint8Array, n: number, veces = 1): Uint8Array {
+  let a = m
+  for (let t = 0; t < veces; t++) {
+    const b = new Uint8Array(a)
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (a[y * n + x]) continue
+        let hay = false
+        for (let dy = -1; dy <= 1 && !hay; dy++) {
+          const yy = y + dy
+          if (yy < 0 || yy >= n) continue
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx
+            if (xx >= 0 && xx < n && a[yy * n + xx]) { hay = true; break }
+          }
+        }
+        if (hay) b[y * n + x] = 1
+      }
+    }
+    a = b
+  }
+  return a
+}
+
+function erosionar8(m: Uint8Array, n: number, veces = 1): Uint8Array {
+  let a = m
+  for (let t = 0; t < veces; t++) {
+    const b = new Uint8Array(n * n)
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        if (!a[y * n + x]) continue
+        let todos = true
+        for (let dy = -1; dy <= 1 && todos; dy++) {
+          const yy = y + dy
+          if (yy < 0 || yy >= n) { todos = false; break }
+          for (let dx = -1; dx <= 1; dx++) {
+            const xx = x + dx
+            if (xx < 0 || xx >= n || !a[yy * n + xx]) { todos = false; break }
+          }
+        }
+        if (todos) b[y * n + x] = 1
+      }
+    }
+    a = b
+  }
+  return a
+}
+
+function cierreYDilatacion(m: Uint8Array, n: number, silueta: Uint8Array): Uint8Array {
+  const dil = dilatar8(m, n, 1)
+  const cer = erosionar8(dil, n, 1)
+  const dil2 = dilatar8(cer, n, 1)
+  const out = new Uint8Array(n * n)
+  for (let i = 0; i < n * n; i++) {
+    if (dil2[i] && silueta[i]) out[i] = 1
+  }
+  return out
+}
+
+function aperturaCierre(m: Uint8Array, n: number): Uint8Array {
+  const er1 = erosionar(m, n, 1)
+  const ap = dilatar(er1, n, 1)
+  const dil = dilatar(ap, n, 1)
+  return erosionar(dil, n, 1)
+}
+
 // Detecta huecos de mordedura de gusano cogollero en la hoja, sin falsos positivos.
-export function huecosMordedura(mascara: Uint8Array | null, n = LADO): ResultadoHuecos {
+export function huecosMordedura(
+  mascara: Uint8Array | null,
+  rgb?: Float32Array | null,
+  lado = LADO_HUECOS
+): ResultadoHuecos {
   if (!mascara) return { cantidad: 0, fraccion: 0, fuerte: false }
   let tieneHoja = false
-  for (let i = 0; i < n * n; i++) if (mascara[i]) { tieneHoja = true; break }
+  for (let i = 0; i < mascara.length; i++) if (mascara[i]) { tieneHoja = true; break }
   if (!tieneHoja) return { cantidad: 0, fraccion: 0, fuerte: false }
 
-  const llena = rellenar(mascara, n)
-  let areaHoja = 0
-  for (let i = 0; i < n * n; i++) if (llena[i]) areaHoja++
-  if (areaHoja <= 0) return { cantidad: 0, fraccion: 0, fuerte: false }
+  const nMask = Math.round(Math.sqrt(mascara.length))
+  const llenaOrig = rellenar(mascara, nMask)
 
-  const huecos = new Uint8Array(n * n)
-  let hayHuecos = false
-  for (let i = 0; i < n * n; i++) {
-    if (llena[i] && !mascara[i]) { huecos[i] = 1; hayHuecos = true }
+  let n = nMask
+  let siluetaEval = llenaOrig
+  let huecosRaw: Uint8Array
+  let areaHoja = 0
+
+  if (!rgb) {
+    for (let i = 0; i < n * n; i++) if (llenaOrig[i]) areaHoja++
+    if (areaHoja <= 0) return { cantidad: 0, fraccion: 0, fuerte: false }
+    huecosRaw = new Uint8Array(n * n)
+    let hay = false
+    for (let i = 0; i < n * n; i++) {
+      if (llenaOrig[i] && !mascara[i]) { huecosRaw[i] = 1; hay = true }
+    }
+    if (!hay) return { cantidad: 0, fraccion: 0, fuerte: false }
+  } else {
+    n = lado
+    const sil512 = new Uint8Array(n * n)
+    for (let y = 0; y < n; y++) {
+      const sy = Math.floor((y * nMask) / n)
+      for (let x = 0; x < n; x++) {
+        const sx = Math.floor((x * nMask) / n)
+        sil512[y * n + x] = llenaOrig[sy * nMask + sx]
+      }
+    }
+    siluetaEval = rellenar(sil512, n)
+    for (let i = 0; i < n * n; i++) if (siluetaEval[i]) areaHoja++
+    if (areaHoja < 100) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+    const labs = new Float32Array(n * n * 3)
+    const hsvs = new Float32Array(n * n * 3)
+    const tejidos = new Uint8Array(n * n)
+    const verdes = new Uint8Array(n * n)
+    const nPix = n * n
+
+    for (let i = 0; i < nPix; i++) {
+      const r = rgb[i], g = rgb[nPix + i], b = rgb[2 * nPix + i]
+      const [L, A, B] = rgbALab(r, g, b)
+      const [H, S, V] = rgbAHsv(r, g, b)
+      labs[3 * i] = L; labs[3 * i + 1] = A; labs[3 * i + 2] = B
+      hsvs[3 * i] = H; hsvs[3 * i + 1] = S; hsvs[3 * i + 2] = V
+      if (esTejidoHoja(r, g, b, H, S, V)) tejidos[i] = 1
+      if (esVerde(r, g, b, H, S, V)) verdes[i] = 1
+    }
+
+    const iterErosion = Math.max(3, Math.round(0.025 * n))
+    let interior = erosionar(siluetaEval, n, iterErosion)
+    let sumaInt = 0
+    for (let i = 0; i < nPix; i++) if (interior[i]) sumaInt++
+    if (sumaInt < 200) {
+      interior = erosionar(siluetaEval, n, Math.max(1, (iterErosion / 2) | 0))
+      sumaInt = 0
+      for (let i = 0; i < nPix; i++) if (interior[i]) sumaInt++
+    }
+    if (sumaInt < 50) interior = siluetaEval
+
+    const selL: number[] = [], selA: number[] = [], selB: number[] = []
+    for (let i = 0; i < nPix; i++) {
+      if (interior[i] && verdes[i]) {
+        selL.push(labs[3 * i]); selA.push(labs[3 * i + 1]); selB.push(labs[3 * i + 2])
+      }
+    }
+    if (selL.length < 200) {
+      selL.length = 0; selA.length = 0; selB.length = 0
+      for (let i = 0; i < nPix; i++) {
+        if (interior[i] && tejidos[i]) {
+          selL.push(labs[3 * i]); selA.push(labs[3 * i + 1]); selB.push(labs[3 * i + 2])
+        }
+      }
+    }
+    if (selL.length < 100) {
+      selL.length = 0; selA.length = 0; selB.length = 0
+      for (let i = 0; i < nPix; i++) {
+        if (interior[i]) {
+          selL.push(labs[3 * i]); selA.push(labs[3 * i + 1]); selB.push(labs[3 * i + 2])
+        }
+      }
+    }
+    if (selL.length < 50) {
+      selL.length = 0; selA.length = 0; selB.length = 0
+      for (let i = 0; i < nPix; i++) {
+        if (siluetaEval[i]) {
+          selL.push(labs[3 * i]); selA.push(labs[3 * i + 1]); selB.push(labs[3 * i + 2])
+        }
+      }
+    }
+
+    const medL = mediana(selL), medA = mediana(selA), medB = mediana(selB)
+    const madL = mediana(selL.map((v) => Math.abs(v - medL)))
+    const madA = mediana(selA.map((v) => Math.abs(v - medA)))
+    const madB = mediana(selB.map((v) => Math.abs(v - medB)))
+    const sigL = Math.max(1.4826 * madL, 4.0)
+
+    // (a) Candidatos por color dentro de la silueta:
+    // Claramente más oscuro que el tejido (L < med_L - 3*sig_L) o fuera de verde-amarillo con baja saturación
+    const huecosColor = new Uint8Array(nPix)
+    for (let i = 0; i < nPix; i++) {
+      if (siluetaEval[i] && !tejidos[i]) {
+        const esOscuro = labs[3 * i] < (medL - 3.0 * sigL)
+        const H = hsvs[3 * i]
+        const S = hsvs[3 * i + 1]
+        const fueraVerdeAmarillo = (H < 35.0 || H > 175.0)
+        const satBaja = S < 0.35
+        if (esOscuro || (fueraVerdeAmarillo && satBaja)) {
+          huecosColor[i] = 1
+        }
+      }
+    }
+
+    // (b) Cierre y ligera dilatación morfológica (3x3) para recuperar el hueco completo
+    const huecosRecuperados = cierreYDilatacion(huecosColor, n, siluetaEval)
+
+    // Incluir también huecos geométricos de la máscara original si los tuviera
+    huecosRaw = new Uint8Array(huecosRecuperados)
+    for (let y = 0; y < n; y++) {
+      const sy = Math.floor((y * nMask) / n)
+      for (let x = 0; x < n; x++) {
+        const sx = Math.floor((x * nMask) / n)
+        const idxOrig = sy * nMask + sx
+        if (llenaOrig[idxOrig] && !mascara[idxOrig]) {
+          huecosRaw[y * n + x] = 1
+        }
+      }
+    }
   }
-  if (!hayHuecos) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+  const huecosLimpios = !rgb ? aperturaCierre(huecosRaw, n) : huecosRaw
 
   // Dilatación del contorno exterior (2 % del lado) para descartar huecos pegados al borde
   const exterior = new Uint8Array(n * n)
-  for (let i = 0; i < n * n; i++) exterior[i] = llena[i] ? 0 : 1
+  for (let i = 0; i < n * n; i++) exterior[i] = siluetaEval[i] ? 0 : 1
   for (let x = 0; x < n; x++) {
     exterior[x] = 1
     exterior[(n - 1) * n + x] = 1
@@ -258,7 +510,7 @@ export function huecosMordedura(mascara: Uint8Array | null, n = LADO): Resultado
   const vecesBorde = Math.max(1, Math.round(UMBRAL_HUECO_BORDE_PCT * n))
   const zonaBorde = dilatar(exterior, n, vecesBorde)
 
-  const { et, areas } = etiquetar(huecos, n)
+  const { et, areas } = etiquetar(huecosLimpios, n)
   if (!areas.length) return { cantidad: 0, fraccion: 0, fuerte: false }
 
   const compsPuntos: Punto[][] = Array.from({ length: areas.length }, () => [])
@@ -287,7 +539,7 @@ export function huecosMordedura(mascara: Uint8Array | null, n = LADO): Resultado
   let cantidad = 0, areaTotal = 0
   for (let k = 0; k < areas.length; k++) {
     const areaComp = areas[k]
-    // 1. Ignorar componentes muy pequeños (ruido, < 0.05 % del área de la hoja)
+    // 1. Ignorar componentes muy pequeños (ruido, < 0.04 % del área de la hoja)
     if (areaComp < UMBRAL_HUECO_RUIDO_FRAC * areaHoja) continue
     // 2. Ignorar regiones pegadas al contorno exterior o al borde de la imagen
     if (compsBorde[k]) continue
@@ -296,6 +548,34 @@ export function huecosMordedura(mascara: Uint8Array | null, n = LADO): Resultado
     const altoBB = maxY[k] - minY[k] + 1
     const relacionAspecto = Math.max(anchoBB, altoBB) / Math.max(1, Math.min(anchoBB, altoBB))
     if (relacionAspecto > UMBRAL_HUECO_ASPECTO_MAX) continue
+
+    // 3b. Descarta manchas alargadas de tizón (relación de aspecto > 3.5 con tono marrón claro)
+    if (relacionAspecto > 3.5 && rgb) {
+      const ptsK = compsPuntos[k]
+      const nComp = ptsK.length
+      let sumH = 0, sumS = 0, sumL = 0, sumR = 0, sumG = 0, sumB = 0
+      for (let pIdx = 0; pIdx < nComp; pIdx++) {
+        const [px, py] = ptsK[pIdx]
+        const idxPix = py * n + px
+        sumH += hsvs[3 * idxPix]
+        sumS += hsvs[3 * idxPix + 1]
+        sumL += labs[3 * idxPix]
+        sumR += rgb[idxPix]
+        sumG += rgb[nPix + idxPix]
+        sumB += rgb[2 * nPix + idxPix]
+      }
+      const hMed = sumH / nComp, sMed = sumS / nComp, lMed = sumL / nComp
+      const rMed = sumR / nComp, gMed = sumG / nComp, bMed = sumB / nComp
+      const esMarronClaro = (
+        hMed >= 10.0 && hMed <= 50.0 &&
+        sMed >= 0.10 &&
+        lMed >= 25.0 &&
+        rMed >= gMed * 0.90 &&
+        rMed > bMed
+      )
+      if (esMarronClaro) continue
+    }
+
     // 4. Ignorar componentes no convexos / hendiduras (solidez < 0.4)
     const pts = compsPuntos[k]
     if (pts.length < 3) continue
@@ -309,7 +589,7 @@ export function huecosMordedura(mascara: Uint8Array | null, n = LADO): Resultado
 
   const fraccion = areaHoja > 0 ? areaTotal / areaHoja : 0
   const fuerte = (cantidad >= HUECOS_FUERTE_MIN_CANTIDAD && fraccion >= HUECOS_FUERTE_MIN_FRACCION) ||
-                 (cantidad >= HUECOS_FUERTE_GRANDE_CANTIDAD && fraccion >= HUECOS_FUERTE_GRANDE_FRACCION)
+                 (cantidad >= HUECOS_FUERTE_MODERADO_CANTIDAD && fraccion >= HUECOS_FUERTE_MODERADO_FRACCION)
 
   return { cantidad, fraccion: redondea(fraccion), fuerte }
 }

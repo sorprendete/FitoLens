@@ -138,8 +138,10 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado & { visi
   let detalle = mascara ? `Ubicó la planta: ocupa el ${pct(seg!.cobertura)} de la foto` : 'No se pudo separar la planta del fondo con seguridad; se usa la foto completa'
 
   // Detección de daño por mordedura (huecos de gusano cogollero) para maíz:
-  if (cultivo === 'maiz' && seg?.ok && seg.mascara) {
-    const mordedura = huecosMordedura(seg.mascara)
+  const claseModelo = me.clases[mejor].id
+  if (cultivo === 'maiz' && (claseModelo === 'maiz_tizon_hoja' || claseModelo === 'maiz_gusano_cogollero') && seg?.ok && seg.mascara) {
+    const rgb512 = await tensor(512, 512)
+    const mordedura = huecosMordedura(seg.mascara, rgb512, 512)
     if (mordedura.fuerte) {
       const kCogollero = idx.find((k) => me.clases[k].id === 'maiz_gusano_cogollero')
       const confCogollero = kCogollero !== undefined ? p[idx.indexOf(kCogollero)] : 0
