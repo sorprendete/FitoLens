@@ -12,7 +12,7 @@ from PIL import Image
 from app.ia import mapa_calor
 from app.ia.modelo import promedio, softmax
 from app.ia.registro import Registro
-from app.ia.segmentacion import Segmentacion, Segmentador, apta_para, fraccion_huecos_internos
+from app.ia.segmentacion import Segmentacion, Segmentador, apta_para, huecos_mordedura
 
 # La segmentación corre en paralelo con el router y el especialista (ONNX libera el GIL).
 _HILOS = ThreadPoolExecutor(max_workers=4, thread_name_prefix="segmentacion")
@@ -28,9 +28,9 @@ LIMITE_VOLTEO = 0.7
 
 # Reglas para maíz: ambigüedad entre cogollero y tizón de la hoja, y daño por mordedura
 MARGEN_AMBIGUEDAD_MAIZ = 0.15
-UMBRAL_HUECOS_MAIZ = 0.03
 PAR_CONFLICTO_MAIZ = ("maiz_gusano_cogollero", "maiz_tizon_hoja")
 MOTIVO_MAIZ_AMBIGUO = "Puede ser gusano cogollero o tizon: revisa si hay huecos o aserrin en la hoja."
+MOTIVO_HUECOS_MAIZ = "Se detectaron varios huecos de mordedura en la hoja."
 
 NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao",
                    "maiz": "maíz", "limon": "limón", "naranja": "naranja"}
@@ -85,13 +85,13 @@ def _segmentar_medido(seg: Segmentador, imagen: Image.Image) -> tuple[Segmentaci
     return r, round((time.perf_counter() - inicio) * 1000)
 
 
-def diagnosticar(registro: Registro, imagen: Image.Image, segmentador=_POR_DEFECTO) -> Resultado:
+def diagnosticar(registro: Registro, imagen: Image.Image, segmentador=_POR_DEFECTO, regla_huecos: bool = True) -> Resultado:
     """segmentador: por defecto el del registro; None la desactiva (útil para comparar)."""
     reloj = _Cronometro()
     seg = registro.segmentador if segmentador is _POR_DEFECTO else segmentador
     tarea = _HILOS.submit(_segmentar_medido, seg, imagen) if seg is not None else None
     try:
-        return _diagnosticar(registro, imagen, reloj, tarea)
+        return _diagnosticar(registro, imagen, reloj, tarea, regla_huecos=regla_huecos)
     finally:
         if tarea is not None:
             tarea.cancel()  # si la foto se rechazó antes, no hace falta esperarla
@@ -114,7 +114,7 @@ def _hoja(r: Resultado, tarea, reloj: _Cronometro) -> Segmentacion | None:
     return seg if seg is not None and seg.ok else None
 
 
-def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, tarea) -> Resultado:
+def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, tarea, regla_huecos: bool = True) -> Resultado:
     router = registro.router
     r = Resultado(estado="rechazada", modelo_version=router.version)
 
@@ -184,14 +184,23 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
 
     # 4. Dónde está la hoja (calculado en paralelo)
     hoja = _hoja(r, tarea, reloj)
-    # Comprobación de daño por mordedura (huecos internos en la hoja) para maíz:
-    # si la segmentación muestra huecos (> 3% del área) y la ganadora es tizón de la hoja,
-    # no se devuelve tizón con confianza alta: devuelve no concluyente.
-    if r.estado == "diagnostico" and cultivo == "maiz" and clase.id == "maiz_tizon_hoja":
-        if hoja is not None and hoja.mascara is not None:
-            if fraccion_huecos_internos(hoja.mascara) > UMBRAL_HUECOS_MAIZ:
-                r.estado, r.clase, r.etiqueta, r.enferma = "no_concluyente", None, None, False
-                r.motivo = MOTIVO_MAIZ_AMBIGUO
+    # Detección de daño por mordedura (huecos de gusano cogollero) para maíz:
+    if regla_huecos and cultivo == "maiz" and hoja is not None and hoja.mascara is not None:
+        mordedura = huecos_mordedura(hoja.mascara)
+        if mordedura["fuerte"]:
+            idx_cogollero = next((idx for idx in indices if em.clases[idx].id == "maiz_gusano_cogollero"), None)
+            p_cogollero = 0.0
+            if idx_cogollero is not None and idx_cogollero in indices:
+                p_cogollero = float(p[indices.index(idx_cogollero)])
+            clase_cogollero = em.clases[idx_cogollero] if idx_cogollero is not None else clase
+            r.estado = "diagnostico"
+            r.clase = "maiz_gusano_cogollero"
+            r.etiqueta = clase_cogollero.etiqueta
+            r.enferma = not clase_cogollero.sana
+            r.confianza = round(max(p_cogollero, 0.6), 4)
+            r.motivo = MOTIVO_HUECOS_MAIZ
+            if idx_cogollero is not None:
+                mejor = idx_cogollero
 
     if hoja is not None and not apta_para(hoja, cultivo):
         hoja = None

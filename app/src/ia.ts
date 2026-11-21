@@ -3,7 +3,7 @@
 import { Asset } from 'expo-asset'
 import { NombreModelo, archivo, manifest } from './modelos'
 import { aTensor } from './imagen'
-import { ATENCION_MIN_DENTRO, LADO, Punto, Segmentacion, analizar, aptaPara, fraccionDentro, mapaCalor } from './vision'
+import { ATENCION_MIN_DENTRO, LADO, Punto, Segmentacion, analizar, aptaPara, fraccionDentro, huecosMordedura, mapaCalor } from './vision'
 
 export type Paso = { id: string; titulo: string; detalle: string; ms: number }
 export type Resultado = {
@@ -123,7 +123,7 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado & { visi
   // 3. Calibración y umbral
   const orden = p.map((v, j) => [v, idx[j]] as const).sort((a, b) => b[0] - a[0])
   r.top3 = orden.slice(0, 3).map(([v, k]) => ({ clase: me.clases[k].id, etiqueta: etiqueta(me.clases[k]), confianza: v }))
-  const [conf, mejor] = orden[0]
+  let [conf, mejor] = orden[0]
   r.confianza = conf
   r.version = `${mr.version} + ${nombre} ${me.version}`
   const umbral = me.umbral ?? 0.6
@@ -136,6 +136,23 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado & { visi
   reloj()
   let mascara = seg?.ok ? seg.mascara : null
   let detalle = mascara ? `Ubicó la planta: ocupa el ${pct(seg!.cobertura)} de la foto` : 'No se pudo separar la planta del fondo con seguridad; se usa la foto completa'
+
+  // Detección de daño por mordedura (huecos de gusano cogollero) para maíz:
+  if (cultivo === 'maiz' && seg?.ok && seg.mascara) {
+    const mordedura = huecosMordedura(seg.mascara)
+    if (mordedura.fuerte) {
+      const kCogollero = idx.find((k) => me.clases[k].id === 'maiz_gusano_cogollero')
+      const confCogollero = kCogollero !== undefined ? p[idx.indexOf(kCogollero)] : 0
+      const claseCogollero = kCogollero !== undefined ? me.clases[kCogollero] : null
+      r.estado = 'diagnostico'
+      r.clase = 'maiz_gusano_cogollero'
+      r.etiqueta = claseCogollero ? etiqueta(claseCogollero) : 'Gusano cogollero'
+      r.confianza = Math.max(confCogollero, 0.6)
+      r.motivo = 'Se detectaron varios huecos de mordedura en la hoja.'
+      if (kCogollero !== undefined) mejor = kCogollero
+    }
+  }
+
   if (mascara && !aptaPara(seg!, cultivo)) { mascara = null; detalle = 'La forma ubicada no parece una sola mazorca; se usa la foto completa' }
   const [h, w] = salida.camTam
   if (mascara && salida.cam && fraccionDentro(salida.cam, mejor, h, w, mascara) < ATENCION_MIN_DENTRO) {

@@ -12,6 +12,19 @@ const COBERTURA_GRANDE = 0.75, CONFIANZA_GRANDE = 0.9
 const SOLIDEZ_MIN: Record<string, number> = { cacao: 0.75 }
 const MAX_POLIGONOS = 5, MAX_PUNTOS = 120
 
+// Umbrales para detección de huecos de gusano cogollero en maíz
+export const UMBRAL_HUECO_RUIDO_FRAC = 0.0005 // Descarta componentes < 0.05 % del área de la hoja
+export const UMBRAL_HUECO_ASPECTO_MAX = 6.0 // Descarta componentes alargados (relación de aspecto > 6)
+export const UMBRAL_HUECO_SOLIDEZ_MIN = 0.4 // Descarta componentes no convexos / hendiduras (solidez < 0.4)
+export const UMBRAL_HUECO_BORDE_PCT = 0.02 // Margen del contorno exterior (2 % del lado de la imagen)
+
+export const HUECOS_FUERTE_MIN_CANTIDAD = 3
+export const HUECOS_FUERTE_MIN_FRACCION = 0.02
+export const HUECOS_FUERTE_GRANDE_CANTIDAD = 1
+export const HUECOS_FUERTE_GRANDE_FRACCION = 0.06
+
+export type ResultadoHuecos = { cantidad: number; fraccion: number; fuerte: boolean }
+
 export type Punto = [number, number]
 export type Segmentacion = {
   ok: boolean; mascara: Uint8Array | null; cobertura: number; confianza: number; nucleo: number; solidez: number
@@ -201,6 +214,104 @@ function solidez(p: Punto[]): number {
   for (const q of [...o].reverse()) { while (sup.length >= 2 && cruz(sup[sup.length - 2], sup[sup.length - 1], q) <= 0) sup.pop(); sup.push(q) }
   const casco = inf.slice(0, -1).concat(sup.slice(0, -1)), ac = areaPoligono(casco)
   return ac > 1e-12 ? areaPoligono(p) / ac : 0
+}
+
+function areaCasco(pts: Punto[]): number {
+  if (pts.length < 3) return 0
+  const o = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1])
+  const cruz = (a: Punto, b: Punto, c: Punto) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])
+  const inf: Punto[] = [], sup: Punto[] = []
+  for (const q of o) { while (inf.length >= 2 && cruz(inf[inf.length - 2], inf[inf.length - 1], q) <= 0) inf.pop(); inf.push(q) }
+  for (const q of [...o].reverse()) { while (sup.length >= 2 && cruz(sup[sup.length - 2], sup[sup.length - 1], q) <= 0) sup.pop(); sup.push(q) }
+  const casco = inf.slice(0, -1).concat(sup.slice(0, -1))
+  return areaPoligono(casco)
+}
+
+// Detecta huecos de mordedura de gusano cogollero en la hoja, sin falsos positivos.
+export function huecosMordedura(mascara: Uint8Array | null, n = LADO): ResultadoHuecos {
+  if (!mascara) return { cantidad: 0, fraccion: 0, fuerte: false }
+  let tieneHoja = false
+  for (let i = 0; i < n * n; i++) if (mascara[i]) { tieneHoja = true; break }
+  if (!tieneHoja) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+  const llena = rellenar(mascara, n)
+  let areaHoja = 0
+  for (let i = 0; i < n * n; i++) if (llena[i]) areaHoja++
+  if (areaHoja <= 0) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+  const huecos = new Uint8Array(n * n)
+  let hayHuecos = false
+  for (let i = 0; i < n * n; i++) {
+    if (llena[i] && !mascara[i]) { huecos[i] = 1; hayHuecos = true }
+  }
+  if (!hayHuecos) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+  // Dilatación del contorno exterior (2 % del lado) para descartar huecos pegados al borde
+  const exterior = new Uint8Array(n * n)
+  for (let i = 0; i < n * n; i++) exterior[i] = llena[i] ? 0 : 1
+  for (let x = 0; x < n; x++) {
+    exterior[x] = 1
+    exterior[(n - 1) * n + x] = 1
+    exterior[x * n] = 1
+    exterior[x * n + n - 1] = 1
+  }
+  const vecesBorde = Math.max(1, Math.round(UMBRAL_HUECO_BORDE_PCT * n))
+  const zonaBorde = dilatar(exterior, n, vecesBorde)
+
+  const { et, areas } = etiquetar(huecos, n)
+  if (!areas.length) return { cantidad: 0, fraccion: 0, fuerte: false }
+
+  const compsPuntos: Punto[][] = Array.from({ length: areas.length }, () => [])
+  const compsBorde: boolean[] = new Array(areas.length).fill(false)
+  const minX = new Int32Array(areas.length).fill(n)
+  const maxX = new Int32Array(areas.length).fill(-1)
+  const minY = new Int32Array(areas.length).fill(n)
+  const maxY = new Int32Array(areas.length).fill(-1)
+
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      const idx = y * n + x
+      const e = et[idx]
+      if (e > 0) {
+        const k = e - 1
+        compsPuntos[k].push([x, y])
+        if (zonaBorde[idx]) compsBorde[k] = true
+        if (x < minX[k]) minX[k] = x
+        if (x > maxX[k]) maxX[k] = x
+        if (y < minY[k]) minY[k] = y
+        if (y > maxY[k]) maxY[k] = y
+      }
+    }
+  }
+
+  let cantidad = 0, areaTotal = 0
+  for (let k = 0; k < areas.length; k++) {
+    const areaComp = areas[k]
+    // 1. Ignorar componentes muy pequeños (ruido, < 0.05 % del área de la hoja)
+    if (areaComp < UMBRAL_HUECO_RUIDO_FRAC * areaHoja) continue
+    // 2. Ignorar regiones pegadas al contorno exterior o al borde de la imagen
+    if (compsBorde[k]) continue
+    // 3. Ignorar componentes muy alargados y delgados (relación de aspecto > 6)
+    const anchoBB = maxX[k] - minX[k] + 1
+    const altoBB = maxY[k] - minY[k] + 1
+    const relacionAspecto = Math.max(anchoBB, altoBB) / Math.max(1, Math.min(anchoBB, altoBB))
+    if (relacionAspecto > UMBRAL_HUECO_ASPECTO_MAX) continue
+    // 4. Ignorar componentes no convexos / hendiduras (solidez < 0.4)
+    const pts = compsPuntos[k]
+    if (pts.length < 3) continue
+    const ac = areaCasco(pts)
+    const sol = ac > 1e-6 ? areaComp / ac : 0
+    if (sol < UMBRAL_HUECO_SOLIDEZ_MIN) continue
+
+    cantidad++
+    areaTotal += areaComp
+  }
+
+  const fraccion = areaHoja > 0 ? areaTotal / areaHoja : 0
+  const fuerte = (cantidad >= HUECOS_FUERTE_MIN_CANTIDAD && fraccion >= HUECOS_FUERTE_MIN_FRACCION) ||
+                 (cantidad >= HUECOS_FUERTE_GRANDE_CANTIDAD && fraccion >= HUECOS_FUERTE_GRANDE_FRACCION)
+
+  return { cantidad, fraccion: redondea(fraccion), fuerte }
 }
 
 // ---- mapa de calor ----

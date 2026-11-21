@@ -43,6 +43,19 @@ MAX_POLIGONOS = 5
 MAX_PUNTOS = 120
 
 
+# Umbrales para detección de huecos de gusano cogollero en maíz
+UMBRAL_HUECO_RUIDO_FRAC = 0.0005  # Descarta componentes < 0.05 % del área de la hoja
+UMBRAL_HUECO_ASPECTO_MAX = 6.0    # Descarta componentes alargados (relación de aspecto > 6)
+UMBRAL_HUECO_SOLIDEZ_MIN = 0.4    # Descarta componentes no convexos / hendiduras (solidez < 0.4)
+UMBRAL_HUECO_BORDE_PCT = 0.02     # Margen del contorno exterior (2 % del lado de la imagen)
+
+# Condiciones de mordedura fuerte: al menos 3 huecos y 2 % del área, o al menos 1 hueco grande (6 % del área)
+HUECOS_FUERTE_MIN_CANTIDAD = 3
+HUECOS_FUERTE_MIN_FRACCION = 0.02
+HUECOS_FUERTE_GRANDE_CANTIDAD = 1
+HUECOS_FUERTE_GRANDE_FRACCION = 0.06
+
+
 @dataclass
 class Segmentacion:
     ok: bool
@@ -60,14 +73,97 @@ def _fallo(motivo: str, **datos) -> Segmentacion:
     return Segmentacion(ok=False, motivo=motivo, **datos)
 
 
+def huecos_mordedura(mascara: np.ndarray | None) -> dict:
+    """Detecta huecos de mordedura de gusano cogollero en la hoja, sin falsos positivos.
+
+    Devuelve dict con:
+      - cantidad (int): número de huecos válidos que superaron todos los filtros
+      - fraccion (float): área total de huecos válidos / área de la hoja
+      - fuerte (bool): True si (cantidad >= 3 y fraccion >= 0.02) o (cantidad >= 1 y fraccion >= 0.06)
+    """
+    if mascara is None:
+        return {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+    m = np.asarray(mascara, dtype=bool)
+    if m.ndim != 2 or not m.any():
+        return {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+
+    llena = ndimage.binary_fill_holes(m)
+    area_hoja = float(llena.sum())
+    if area_hoja <= 0:
+        return {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+
+    huecos_raw = llena & (~m)
+    if not huecos_raw.any():
+        return {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+
+    # Dilatar el contorno exterior (2 % del lado) para descartar huecos pegados al borde
+    lado = max(m.shape)
+    radio_borde = max(1, int(round(UMBRAL_HUECO_BORDE_PCT * lado)))
+    exterior = (~llena).copy()
+    exterior[0, :] = True
+    exterior[-1, :] = True
+    exterior[:, 0] = True
+    exterior[:, -1] = True
+    zona_borde = ndimage.binary_dilation(exterior, iterations=radio_borde)
+
+    etiquetas, n = ndimage.label(huecos_raw, structure=np.ones((3, 3)))
+    if n == 0:
+        return {"cantidad": 0, "fraccion": 0.0, "fuerte": False}
+
+    huecos_validos = []
+    area_total = 0
+
+    for k in range(1, n + 1):
+        comp = (etiquetas == k)
+        area_comp = int(comp.sum())
+
+        # 1. Ignorar componentes muy pequeños (ruido, < 0.05 % del área de la hoja)
+        if area_comp < UMBRAL_HUECO_RUIDO_FRAC * area_hoja:
+            continue
+
+        # 2. Ignorar regiones pegadas al contorno exterior o al borde de la imagen
+        if np.any(comp & zona_borde):
+            continue
+
+        # 3. Ignorar componentes muy alargados y delgados (relación de aspecto > 6)
+        ys, xs = np.nonzero(comp)
+        alto_bb = int(ys.max() - ys.min() + 1)
+        ancho_bb = int(xs.max() - xs.min() + 1)
+        relacion_aspecto = max(alto_bb, ancho_bb) / max(min(alto_bb, ancho_bb), 1)
+        if relacion_aspecto > UMBRAL_HUECO_ASPECTO_MAX:
+            continue
+
+        # 4. Ignorar componentes no convexos / hendiduras (solidez < 0.4)
+        pts = np.column_stack((xs, ys))
+        if len(pts) < 3:
+            continue
+        try:
+            hull = ConvexHull(pts)
+            area_convexa = float(hull.volume)
+            sol = area_comp / area_convexa if area_convexa > 0 else 0.0
+        except Exception:
+            sol = 0.0
+        if sol < UMBRAL_HUECO_SOLIDEZ_MIN:
+            continue
+
+        huecos_validos.append(area_comp)
+        area_total += area_comp
+
+    cantidad = len(huecos_validos)
+    fraccion = area_total / area_hoja if area_hoja > 0 else 0.0
+    fuerte = (cantidad >= HUECOS_FUERTE_MIN_CANTIDAD and fraccion >= HUECOS_FUERTE_MIN_FRACCION) or \
+             (cantidad >= HUECOS_FUERTE_GRANDE_CANTIDAD and fraccion >= HUECOS_FUERTE_GRANDE_FRACCION)
+
+    return {
+        "cantidad": cantidad,
+        "fraccion": round(float(fraccion), 4),
+        "fuerte": bool(fuerte),
+    }
+
+
 def fraccion_huecos_internos(mascara: np.ndarray | None) -> float:
-    """Calcula la fracción de huecos internos (fondo encerrado) respecto al área de la hoja."""
-    if mascara is None or not mascara.any():
-        return 0.0
-    llena = ndimage.binary_fill_holes(mascara)
-    huecos = llena & (~mascara)
-    area_llena = float(llena.sum())
-    return float(huecos.sum()) / area_llena if area_llena > 0 else 0.0
+    """Calcula la fracción de huecos de mordedura respecto al área de la hoja."""
+    return huecos_mordedura(mascara)["fraccion"]
 
 
 class Segmentador:
@@ -125,9 +221,8 @@ def analizar(p: np.ndarray) -> Segmentacion:
     elegidas = [int(k) + 1 for k in orden[:MAX_POLIGONOS] if areas[k] >= minimo]
     m = np.isin(etiquetas, elegidas)  # conserva huecos internos de daño o mordedura
     llena = ndimage.binary_fill_holes(m)
-    huecos = llena & (~m)
-    area_llena = float(llena.sum())
-    fraccion_huecos = float(huecos.sum()) / area_llena if area_llena > 0 else 0.0
+    info_huecos = huecos_mordedura(m)
+    fraccion_huecos = info_huecos["fraccion"]
 
     cobertura = float(m.mean())
     # Nitidez: en una máscara confiable casi todos los píxeles del objeto y de una franja alrededor están cerca
