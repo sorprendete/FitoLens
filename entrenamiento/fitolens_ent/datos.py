@@ -64,7 +64,7 @@ def obtener(clave, cfg, raiz):
     destino = os.path.join(raiz, clave)
     if os.path.isdir(destino) and os.listdir(destino):
         return destino
-    candidatos = [f"fitolens-{clave}"] + ([cfg["ref"].split("/")[1]] if cfg["tipo"] == "kaggle" else [])
+    candidatos = [cfg.get("kaggle_input", f"fitolens-{clave}")] + ([cfg["ref"].split("/")[1]] if cfg["tipo"] == "kaggle" else [])
     for nombre in candidatos:
         d = _buscar_input(nombre)
         if d:
@@ -78,14 +78,6 @@ def obtener(clave, cfg, raiz):
     t = cfg["tipo"]
     log(f"{clave}: descargando ({t})")
     if t == "kaggle":
-        try:
-            import kagglehub
-            d = kagglehub.dataset_download(cfg["ref"])
-            if d and os.path.isdir(d):
-                log(f"{clave}: descargado con kagglehub en {d}")
-                return d
-        except Exception as e_kh:
-            log(f"{clave}: kagglehub no pudo descargarlo ({e_kh})")
         raise RuntimeError(f"agrega el dataset con '+ Add Input': kaggle.com/datasets/{cfg['ref']}")
     if t == "git":
         subprocess.run(["git", "clone", "-q", "--depth", "1", cfg["url"], destino], check=True)
@@ -150,7 +142,7 @@ def indexar(clave, cfg, carpeta):
         split = None
         if cfg.get("split_por_carpeta"):
             split = "test" if "/test/" in f"/{rel.lower()}" else "pool"
-        base = dict(ruta=p, fuente=clave, campo=cfg["campo"], split_fijo=split, caja=None)
+        base = dict(ruta=p, fuente=clave, campo=cfg["campo"], split_fijo="train" if cfg.get("solo_train") else split, caja=None)
         txt = txts.get(os.path.splitext(os.path.basename(p))[0])
         if cfg.get("recorte_yolo") and txt:
             for nom, *caja in _cajas_yolo(txt, nombres):
@@ -195,92 +187,6 @@ def _cachear(args):
         return None, str(e)
 
 
-def sincronizar_foto_ronald():
-    """Copia la foto de Ronald api/pruebas/huecos/fotos/maiz_gusano_cogollero/ronald_huecos.jpg
-    a entrenamiento/fotos_campo y entrenamiento/fotos_propias si existe."""
-    posibles = [
-        os.path.join(os.getcwd(), "api", "pruebas", "huecos", "fotos", "maiz_gusano_cogollero", "ronald_huecos.jpg"),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "api", "pruebas", "huecos", "fotos", "maiz_gusano_cogollero", "ronald_huecos.jpg")),
-    ]
-    origen = next((p for p in posibles if os.path.exists(p)), None)
-    if not origen:
-        return
-    raiz_ent = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-    destinos = [
-        os.path.join(raiz_ent, "fotos_campo", "maiz_gusano_cogollero", "ronald_huecos.jpg"),
-        os.path.join(raiz_ent, "fotos_campo", "ronald_huecos.jpg"),
-        os.path.join(raiz_ent, "fotos_propias", "maiz_gusano_cogollero", "ronald_huecos.jpg"),
-    ]
-    for d in destinos:
-        try:
-            if not os.path.exists(d):
-                os.makedirs(os.path.dirname(d), exist_ok=True)
-                shutil.copy2(origen, d)
-                log(f"foto de Ronald sincronizada en {d}")
-        except Exception as e:
-            log(f"no se pudo copiar foto de Ronald a {d}: {e}")
-
-
-def buscar_fotos_propias(trabajo):
-    """Localiza la carpeta de fotos propias del usuario."""
-    sincronizar_foto_ronald()
-    candidatos = [
-        os.path.join(trabajo, "fotos_propias"),
-        os.path.join(os.getcwd(), "entrenamiento", "fotos_propias"),
-        os.path.join(os.getcwd(), "fotos_propias"),
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "fotos_propias")),
-    ]
-    if os.path.isdir(KAGGLE_INPUT):
-        for nombre in ("fotos_propias", "fitolens-fotos-propias", "fotos-propias"):
-            d = _buscar_input(nombre)
-            if d:
-                candidatos.append(d)
-    for c in candidatos:
-        if os.path.isdir(c):
-            imgs = [p for p in glob.glob(os.path.join(c, "**", "*"), recursive=True) if p.lower().endswith(EXT)]
-            if imgs:
-                return c
-    return None
-
-
-def indexar_fotos_propias(carpeta, modelo, clases):
-    """Indexa entrenamiento/fotos_propias/<clase>/*.jpg.
-    - La foto ronald_huecos.jpg queda como prueba de campo (split='test', no entrenamiento).
-    - Las demás fotos se suman al entrenamiento (split='train') con peso alto (repetidas 5 veces con aumentos).
-    """
-    muestras = []
-    imgs = [p for p in glob.glob(os.path.join(carpeta, "**", "*"), recursive=True) if p.lower().endswith(EXT)]
-    for p in imgs:
-        carp = os.path.basename(os.path.dirname(p))
-        nom = os.path.basename(p).lower()
-        et = None
-        if carp in clases:
-            et = carp
-        elif modelo == "maiz":
-            et = reglas.maiz(carp, {})
-            if et not in clases:
-                et = None
-        else:
-            et = reglas.etiqueta_para_modelo(carp, modelo, clases)
-        if not et:
-            continue
-        es_ronald = "ronald_huecos" in nom
-        if es_ronald:
-            muestras.append(dict(
-                ruta=p, fuente="fotos_propias", campo=True, split_fijo="test",
-                etiqueta=et, caja=None, grupo="ronald_huecos"
-            ))
-        else:
-            # 5 repeticiones para peso alto con aumentos en entrenamiento
-            for rep in range(5):
-                muestras.append(dict(
-                    ruta=p, fuente="fotos_propias", campo=True, split_fijo="train",
-                    etiqueta=et, caja=None, grupo=f"propia_{hashlib.md5(p.encode()).hexdigest()[:8]}_{rep}"
-                ))
-    log(f"fotos_propias: {len(imgs)} imágenes en {carpeta} -> {len(muestras)} muestras generadas (5x peso entrenamiento)")
-    return muestras
-
-
 def _partir(muestras, semilla):
     """Asigna train / val / test / lab_prueba respetando grupos."""
     rnd = random.Random(semilla)
@@ -293,10 +199,10 @@ def _partir(muestras, semilla):
         m0 = ms[0]
         if not m0["campo"]:
             asignado[g] = "lab_prueba" if rnd.random() < 0.10 else "train"
+        elif m0["split_fijo"] == "train":   # fuentes aumentadas o recortadas: solo entrenamiento
+            asignado[g] = "train"
         elif m0["split_fijo"] == "test":
             asignado[g] = "test"
-        elif m0["split_fijo"] == "train":
-            asignado[g] = "train"
         else:
             por_fuente_et[(m0["fuente"], m0["etiqueta"], m0["split_fijo"])].append(g)
     for (fuente, et, fijo), gs in por_fuente_et.items():
@@ -353,11 +259,6 @@ def preparar(modelo, trabajo, semilla=42, prueba=False):
             for et, lista in por_et.items():
                 rnd.shuffle(lista)
                 muestras += lista[: catalogo.receta(modelo)["max_por_clase_y_fuente"]]
-        # Incorporar fotos propias del usuario (entrenamiento/fotos_propias/<clase>/*.jpg)
-        carpeta_propias = buscar_fotos_propias(trabajo)
-        if carpeta_propias:
-            ms_propias = indexar_fotos_propias(carpeta_propias, modelo, clases)
-            muestras += ms_propias
         log(f"cacheando {len(muestras)} fotos (redimensión a {LADO_CACHE}px y hash perceptual)")
         cache = os.path.join(trabajo, "cache")
         with Pool(os.cpu_count()) as pool:

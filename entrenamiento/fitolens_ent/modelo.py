@@ -52,8 +52,26 @@ class ParaExportar(nn.Module):
         return logits, cam
 
 
+class ParaExportarEnsamble(nn.Module):
+    """Promedio de varias redes: logits y CAM (todas dan mapas del mismo tamaño)."""
+
+    def __init__(self, redes, tta=True):
+        super().__init__()
+        self.partes = nn.ModuleList([ParaExportar(r, tta) for r in redes])
+
+    def forward(self, imagen):
+        salidas = [p(imagen) for p in self.partes]
+        n = len(salidas)
+        return sum(s[0] for s in salidas) / n, sum(s[1] for s in salidas) / n
+
+
+def para_exportar(redes, tta=True):
+    redes = redes if isinstance(redes, (list, tuple)) else [redes]
+    return (ParaExportar(redes[0], tta) if len(redes) == 1 else ParaExportarEnsamble(redes, tta)).cpu().eval()
+
+
 def exportar_onnx(red, ruta, tam, tta=True):
-    m = ParaExportar(red, tta).cpu().eval()
+    m = para_exportar(red, tta)
     x = torch.rand(1, 3, tam, tam)
     kw = dict(input_names=["imagen"], output_names=["logits", "cam"], opset_version=17,
               dynamic_axes={"imagen": {0: "n"}, "logits": {0: "n"}, "cam": {0: "n"}})

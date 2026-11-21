@@ -57,31 +57,25 @@ class JPEGAleatorio:
         return Image.open(b).convert("RGB")
 
 
-def entrenamiento(tam, escala_min=0.35, cultivo=None):
-    # En maíz o cuando escala_min >= 0.50 se evitan recortes agresivos que saquen los huecos
-    # y distorsiones de aspecto alargadas que hagan parecer los agujeros como tizón.
-    es_maiz = cultivo == "maiz" or escala_min >= 0.50
-    ratio = (0.85, 1.18) if es_maiz else (0.75, 1.33)
-    p_blur = 0.10 if es_maiz else 0.25
-    sigma_blur = (0.1, 1.0) if es_maiz else (0.1, 2.0)
-    p_erasing = 0.10 if es_maiz else 0.20
-    escala_erasing = (0.02, 0.05) if es_maiz else (0.02, 0.12)
-
+def entrenamiento(tam, suave=False):
+    # suave (maíz): recortes grandes, poca deformación, poco desenfoque y borrado, para no perder
+    # los huecos y el aserrín del gusano cogollero ni estirarlos en forma de lesión de tizón
     return T.Compose([
-        T.RandomResizedCrop(tam, scale=(escala_min, 1.0), ratio=ratio, antialias=True),
+        T.RandomResizedCrop(tam, scale=(0.6, 1.0) if suave else (0.35, 1.0),
+                            ratio=(0.85, 1.18) if suave else (0.75, 1.33), antialias=True),
         T.RandomHorizontalFlip(), T.RandomVerticalFlip(0.2), T.RandomRotation(20),
         T.ColorJitter(0.4, 0.4, 0.3, 0.05),
-        T.RandomApply([T.GaussianBlur(5, sigma_blur)], p=p_blur),
+        T.RandomApply([T.GaussianBlur(5, (0.1, 1.0) if suave else (0.1, 2.0))], p=0.1 if suave else 0.25),
         JPEGAleatorio(),
         T.PILToTensor(), T.ToDtype(torch.float32, scale=True),
-        T.RandomErasing(p=p_erasing, scale=escala_erasing),
+        T.RandomErasing(p=0.1 if suave else 0.2, scale=(0.02, 0.05) if suave else (0.02, 0.12)),
     ])
 
 
 class Conjunto(torch.utils.data.Dataset):
-    def __init__(self, muestras, tam, entrenar=False, fondos=None, escala_min=0.35, cultivo=None):
+    def __init__(self, muestras, tam, entrenar=False, fondos=None, suave=False):
         self.m, self.tam, self.entrenar = muestras, tam, entrenar
-        self.aug = entrenamiento(tam, escala_min=escala_min, cultivo=cultivo) if entrenar else None
+        self.aug = entrenamiento(tam, suave) if entrenar else None
         self.fondo = ReemplazoFondo(fondos or [])
 
     def __len__(self):

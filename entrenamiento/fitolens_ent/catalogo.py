@@ -9,7 +9,7 @@ Para mantener el proyecto, casi todo cambio se hace aquí:
 # ---------------------------------------------------------------- clases
 # ids en snake_case, prefijo de cultivo y "_sana" para las sanas (contrato con la API y la web)
 CLASES = {
-    "router": ["pimiento", "papa", "tomate", "cafe", "cacao", "otra_planta", "no_planta"],
+    "router": ["pimiento", "papa", "tomate", "cafe", "cacao", "maiz", "limon", "naranja", "otra_planta", "no_planta"],
     "hortalizas": [
         "pimiento_mancha_bacteriana", "pimiento_sana",
         "papa_tizon_temprano", "papa_tizon_tardio", "papa_sana",
@@ -19,9 +19,12 @@ CLASES = {
     ],
     "cafe": ["cafe_sana", "cafe_roya", "cafe_ojo_de_gallo"],
     "cacao": ["cacao_sana", "cacao_monilia", "cacao_mazorca_negra"],
-    "maiz": [
-        "maiz_sana", "maiz_tizon_hoja", "maiz_roya_comun", "maiz_mancha_gris",
-        "maiz_gusano_cogollero",
+    "maiz": ["maiz_tizon_hoja", "maiz_roya_comun", "maiz_mancha_gris", "maiz_gusano_cogollero", "maiz_sana"],
+    # un solo modelo para limón y naranja; la API filtra por el cultivo que dio el router
+    "citricos": [
+        "limon_cancrosis", "limon_hlb", "limon_mancha_negra", "limon_melanosis", "limon_sarna",
+        "limon_fumagina", "limon_minador", "limon_sana",
+        "naranja_cancrosis", "naranja_hlb", "naranja_sana",
     ],
 }
 
@@ -38,13 +41,20 @@ ETIQUETAS = {
     "tomate_virus_mosaico": "Tomate: virus del mosaico", "tomate_sana": "Tomate: sana",
     "cafe_sana": "Café: sana", "cafe_roya": "Café: roya", "cafe_ojo_de_gallo": "Café: ojo de gallo",
     "cacao_sana": "Cacao: sana", "cacao_monilia": "Cacao: moniliasis", "cacao_mazorca_negra": "Cacao: mazorca negra",
-    "maiz_sana": "Maíz: sana", "maiz_tizon_hoja": "Maíz: tizón de la hoja",
-    "maiz_roya_comun": "Maíz: roya común", "maiz_mancha_gris": "Maíz: mancha gris",
-    "maiz_gusano_cogollero": "Maíz: gusano cogollero", "maiz": "Maíz",
+    "maiz": "Maíz", "limon": "Limón", "naranja": "Naranja",
+    "maiz_tizon_hoja": "Maíz: tizón de la hoja", "maiz_roya_comun": "Maíz: roya común",
+    "maiz_mancha_gris": "Maíz: mancha gris", "maiz_gusano_cogollero": "Maíz: gusano cogollero",
+    "maiz_sana": "Maíz: sana",
+    "limon_cancrosis": "Limón: cancrosis", "limon_hlb": "Limón: HLB (huanglongbing)",
+    "limon_mancha_negra": "Limón: mancha negra", "limon_melanosis": "Limón: melanosis",
+    "limon_sarna": "Limón: sarna", "limon_fumagina": "Limón: fumagina", "limon_minador": "Limón: minador de la hoja",
+    "limon_sana": "Limón: sana",
+    "naranja_cancrosis": "Naranja: cancrosis", "naranja_hlb": "Naranja: HLB (huanglongbing)", "naranja_sana": "Naranja: sana",
 }
 
 ESPECIALISTA_DE_CULTIVO = {"pimiento": "hortalizas", "papa": "hortalizas", "tomate": "hortalizas",
-                           "cafe": "cafe", "cacao": "cacao", "maiz": "maiz"}
+                           "cafe": "cafe", "cacao": "cacao",
+                           "maiz": "maiz", "limon": "citricos", "naranja": "citricos"}
 RECHAZO = ["otra_planta", "no_planta"]
 
 # ---------------------------------------------------------------- fuentes
@@ -57,12 +67,12 @@ RECHAZO = ["otra_planta", "no_planta"]
 FUENTES = {
     "plantvillage": dict(
         tipo="kaggle", ref="abdallahalidev/plantvillage-dataset", campo=False, regla="hortalizas",
-        incluir="/color/", modelos=["hortalizas", "router"], requerido=True,
+        incluir="/color/", modelos=["hortalizas", "maiz", "citricos", "router"], requerido=True,
         cita="Hughes y Salathé (2015), PlantVillage. Copia en Kaggle: abdallahalidev/plantvillage-dataset",
         licencia="ver la fuente original (PlantVillage)"),
     "plantdoc": dict(
         tipo="git", url="https://github.com/pratikkayal/PlantDoc-Dataset.git", campo=True, regla="hortalizas",
-        split_por_carpeta=True, sin_enfermedad_es_sana=True, modelos=["hortalizas", "router"], requerido=True,
+        split_por_carpeta=True, sin_enfermedad_es_sana=True, modelos=["hortalizas", "maiz", "router"], requerido=True,
         cita="Singh et al. (2020), PlantDoc, CODS-COMAD", licencia="CC BY 4.0"),
     "papa_indonesia": dict(
         tipo="mendeley", id="ptz377bwb8", version=1, campo=True, regla="papa_indonesia",
@@ -76,13 +86,26 @@ FUENTES = {
         licencia="CC BY 4.0"),
     "tomate_bangladesh_2025": dict(
         tipo="mendeley", id="93h9p62kg4", version=1, campo=True, regla="tomate_bangladesh_2025",
-        modelos=["hortalizas", "router"], requerido=False, activo=False,  # licencia no indicada en la página
-        cita="Tomato leaf diseases, Mendeley Data, 10.17632/93h9p62kg4.1", licencia="no indicada (desactivado)"),
+        modelos=["hortalizas", "router"], requerido=True,
+        cita="Tomato leaf diseases (Bangladesh, campo), Mendeley Data, 10.17632/93h9p62kg4.1", licencia="CC BY 4.0"),
     "cafe_saposoa": dict(
         tipo="mendeley", id="mfpxg4y65r", version=2, campo=True, regla="cafe",
         modelos=["cafe", "router"], requerido=True,
         cita="Coffee leaf dataset by phytosanitary class (Saposoa), Mendeley Data, 10.17632/mfpxg4y65r.2",
         licencia="CC BY 4.0"),
+    "cafe_bracol": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-cafe-otras", kaggle_input="fitolens-cafe-otras", incluir="/bracol/",
+        campo=True, regla="cafe", modelos=["cafe", "router"], requerido=True,
+        cita="BRACOL, Brazilian Arabica Coffee Leaf images, Mendeley Data, 10.17632/yy2k5y8mxg.1", licencia="CC BY 4.0"),
+    "cafe_jmuben": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-cafe-otras", kaggle_input="fitolens-cafe-otras", incluir="/jmuben/",
+        campo=True, solo_train=True,   # viene recortada y aumentada: no sirve para medir
+        regla="cafe", modelos=["cafe", "router"], requerido=True,
+        cita="JMuBEN, Arabica coffee leaf images (Kenia), Mendeley Data, 10.17632/t2r6rszp5c.1", licencia="CC BY 4.0"),
+    "cacao_filipinas": dict(
+        tipo="kaggle", ref="zaldyjr/cacao-diseases", campo=True, regla="cacao_yolo",
+        modelos=["cacao", "router"], requerido=True,
+        cita="Cacao Diseases (Filipinas), Kaggle zaldyjr/cacao-diseases", licencia="no indicada en Kaggle"),
     "cacao_monilia": dict(
         tipo="url", url="https://zenodo.org/records/17716661/files/CocoaMoniliaDataSet.zip?download=1",
         extraer=["cocoapods_images/", "YOLO_annotations/"], campo=True, regla="cacao_monilia", recorte_yolo=True,
@@ -92,34 +115,48 @@ FUENTES = {
         tipo="kaggle", ref="serranosebas/enfermedades-cacao-yolov4", campo=True, regla="cacao_yolo",
         recorte_yolo=True, modelos=["cacao", "router"], requerido=False,
         cita="Cocoa Diseases (YOLOv4), Kaggle serranosebas/enfermedades-cacao-yolov4", licencia="ODbL"),
+    # maíz y cítricos: copias reducidas (640 px) en un dataset privado de Kaggle, una carpeta por fuente
     "maiz_bd": dict(
-        tipo="mendeley", id="sb4wwjs8bz", version=1, campo=True, regla="maiz",
-        modelos=["maiz", "router"], requerido=False,
-        cita="An Open-Source Multi-Format Maize Leaf Image Dataset, Mendeley Data, 10.17632/sb4wwjs8bz.1",
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", kaggle_input="fitolens-maiz-citricos",
+        incluir="/maiz_bd/", campo=True, regla="maiz", modelos=["maiz", "router"], requerido=True,
+        cita="An Open-Source Multi-Format Maize Leaf Image Dataset (Bangladesh), Mendeley Data, 10.17632/sb4wwjs8bz.1",
         licencia="CC BY 4.0"),
     "maiz_mld": dict(
-        tipo="mendeley", id="3myfctrgk3", version=1, campo=True, regla="maiz",
-        modelos=["maiz", "router"], requerido=False,
-        cita="MLD: Multi-Class Maize Leaf Disease Image Dataset, Mendeley Data, 10.17632/3myfctrgk3.1",
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", kaggle_input="fitolens-maiz-citricos",
+        incluir="/maiz_mld/", campo=True, regla="maiz", modelos=["maiz", "router"], requerido=True,
+        cita="MLD: A Multi-Class Maize Leaf Disease Image Dataset from Bangladesh, Mendeley Data, 10.17632/3myfctrgk3.1",
         licencia="CC BY 4.0"),
-    # Verificado en Kaggle: humphreyassibi/armyworm-and-affected-plants (fotos de campo de daño de fall armyworm en hojas de maíz)
+    "limon_bd": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", kaggle_input="fitolens-maiz-citricos",
+        incluir="/limon/", cultivo="limon", campo=True, regla="citricos", modelos=["citricos", "router"], requerido=True,
+        cita="Large-Scale Lemon Leaf Disease and Pest Image Dataset from Bangladesh, Mendeley Data, 10.17632/8d9fv6kpt3.3",
+        licencia="CC BY 4.0"),
+    "naranja_bd": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", kaggle_input="fitolens-maiz-citricos",
+        incluir="/naranja/", cultivo="naranja", campo=True, regla="citricos", modelos=["citricos", "router"], requerido=True,
+        cita="Multi-format open-source sweet orange leaf dataset, Mendeley Data, 10.17632/f7cr74mwpj.2",
+        licencia="CC BY 4.0"),
+    "maiz_estacional": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-r4-extra", kaggle_input="fitolens-r4-extra",
+        incluir="/maiz_estacional/", campo=True, regla="maiz", modelos=["maiz", "router"], requerido=True,
+        cita="Seasonal Corn Leaf Disease Dataset (Bangladesh), Mendeley Data, 10.17632/vy629dngm8.1", licencia="CC BY 4.0"),
+    "maiz_africa": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-r5-maiz", kaggle_input="fitolens-r5-maiz",
+        incluir="/maiz_africa/", campo=True, regla="maiz", modelos=["maiz", "router"], requerido=True,
+        cita="Maize Crop Disease (Leaf), Mendeley Data, 10.17632/6w6gsvghfw.1 (solo fotos >400 px)", licencia="CC BY 4.0"),
+    # gusano cogollero: daño foliar (huecos, aserrín) y larvas; solo entrenamiento para no cambiar la prueba
     "maiz_armyworm": dict(
-        tipo="kaggle", ref="humphreyassibi/armyworm-and-affected-plants", campo=True, regla="maiz",
-        modelos=["maiz", "router"], requerido=False,
-        cita="Humphrey Assibi, Armyworm and Affected Plants, Kaggle humphreyassibi/armyworm-and-affected-plants",
-        licencia="CC BY 4.0 / ver Kaggle"),
-    # Verificado en Kaggle: rahimanshu/ccmt-plant-disease-dataset (fotos de campo naturales, incluye clase Maize_fall armyworm)
+        tipo="kaggle", ref="humphreyassibi/armyworm-and-affected-plants", campo=True, solo_train=True,
+        regla="maiz", modelos=["maiz"], requerido=False,
+        cita="Armyworm and Affected Plants, Kaggle humphreyassibi/armyworm-and-affected-plants", licencia="ver Kaggle"),
     "maiz_ccmt": dict(
-        tipo="kaggle", ref="rahimanshu/ccmt-plant-disease-dataset", campo=True, regla="maiz",
-        modelos=["maiz", "router"], requerido=False,
-        cita="CCMT Plant Disease Dataset (Verma et al.), Kaggle rahimanshu/ccmt-plant-disease-dataset",
-        licencia="CC BY 4.0"),
-    # Verificado en Kaggle: dataset privado de Ronald con fotos de campo de maíz y cítricos
-    "maiz_citricos": dict(
-        tipo="kaggle", ref="ronaldlchuquilin/fitolens-maiz-citricos", campo=True, regla="maiz",
-        modelos=["maiz", "router"], requerido=False,
-        cita="Ronald Chuquilin, Fitolens Maíz y Cítricos, Kaggle ronaldlchuquilin/fitolens-maiz-citricos",
-        licencia="privada"),
+        tipo="kaggle", ref="rahimanshu/ccmt-plant-disease-dataset", campo=True, solo_train=True, incluir="maize",
+        regla="maiz", modelos=["maiz"], requerido=False,
+        cita="CCMT Plant Disease Dataset (Ghana), Kaggle rahimanshu/ccmt-plant-disease-dataset", licencia="CC BY 4.0"),
+    "limon_bdl": dict(
+        tipo="kaggle", ref="ronaldlchuquilin/fitolens-r4-extra", kaggle_input="fitolens-r4-extra",
+        incluir="/limon_bdl/", cultivo="limon", campo=True, regla="citricos", modelos=["router"], requerido=True,   # en cítricos bajó el acierto (ronda 4)
+        cita="BDLemonLeaf, Mendeley Data, 10.17632/643f5bbc2t.6", licencia="CC BY 4.0"),
     "no_planta": dict(
         tipo="kaggle", ref="prasunroy/natural-images", campo=True, regla="no_planta",
         modelos=["router"], requerido=True,
@@ -137,21 +174,22 @@ RECETA = dict(
     peso_campo=3.0,             # las fotos de campo salen 3 veces más en el muestreo
     max_por_clase_y_fuente=4000,
     tta=True,                   # espejo horizontal promediado dentro del ONNX
+    ensamble=True,              # si en validación mejora, el ONNX promedia los dos backbones
     precision_objetivo=0.90,    # el umbral se elige para acertar >= 90 % de lo que sí responde (en validación)
     latencia_max_ms=300,        # backbone descartado si supera esto en CPU
     semilla=42,
 )
 RECETA_POR_MODELO = {
-    "router": dict(muestras_por_epoca=16000, epocas=15),
-    "cafe": dict(muestras_por_epoca=4000, epocas=30),
-    "cacao": dict(muestras_por_epoca=4000, epocas=30),
-    "maiz": dict(
-        muestras_por_epoca=6000,
-        epocas=25,
-        escala_recorte_min=0.60,
-        sobremuestreo={"maiz_gusano_cogollero": 2.5},
-        peso_perdida={"maiz_gusano_cogollero": 2.0},
-    ),
+    "router": dict(muestras_por_epoca=16000, epocas=15, ensamble=False),
+    "hortalizas": dict(muestras_por_epoca=14000, peso_campo=4.0),
+    "cafe": dict(muestras_por_epoca=6000, epocas=30),
+    "cacao": dict(muestras_por_epoca=6000, epocas=30),
+    # refuerzo: multiplica cuántas veces sale una clase débil en el muestreo
+    "maiz": dict(muestras_por_epoca=8000, epocas=20, peso_campo=5.0, max_por_clase_y_fuente=1500,
+                 backbones=["convnext_tiny.fb_in22k_ft_in1k"], ensamble=False,
+                 aumento_suave=True, refuerzo={"maiz_roya_comun": 1.5},
+                 peso_perdida={"maiz_gusano_cogollero": 1.5}),
+    "citricos": dict(muestras_por_epoca=12000, refuerzo={"limon_melanosis": 2.0, "limon_mancha_negra": 1.5}),
 }
 MIN_FOTOS_CLASE = 30   # una clase con menos fotos de entrenamiento se quita del modelo (y se avisa)
 

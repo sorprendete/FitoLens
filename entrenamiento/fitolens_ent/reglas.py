@@ -9,7 +9,7 @@ El resumen "carpeta -> etiqueta" se imprime al preparar los datos para poder rev
 """
 import re
 
-CULTIVOS = ("pimiento", "papa", "tomate", "cafe", "cacao", "maiz")
+CULTIVOS = ("pimiento", "papa", "tomate", "cafe", "cacao", "maiz", "limon", "naranja")
 
 
 def _norm(s):
@@ -23,8 +23,12 @@ def _cultivo(s):
         return "papa"
     if re.search(r"tomato|tomate", s):
         return "tomate"
-    if re.search(r"maiz|corn|maize|zea", s):
+    if re.search(r"corn|maize|maiz", s):
         return "maiz"
+    if re.search(r"orange|naranja", s):   # PlantVillage "Orange___Haunglongbing"
+        return "naranja"
+    if re.search(r"lemon|lime\b|limon", s):
+        return "limon"
     return None
 
 
@@ -58,6 +62,10 @@ def hortalizas(carpeta, cfg):
     c = _cultivo(s)
     if c is None:
         return "otra_planta"
+    if c == "maiz":
+        return maiz(carpeta, cfg)
+    if c in ("limon", "naranja"):
+        return citricos(carpeta, dict(cfg, cultivo=c))
     e = _enfermedad(s, c)
     if e is None and cfg.get("sin_enfermedad_es_sana"):
         e = "sana"   # PlantDoc: "Tomato leaf" y "Bell_pepper leaf" son hojas sanas
@@ -66,9 +74,9 @@ def hortalizas(carpeta, cfg):
 
 def tomate_bangladesh_2025(carpeta, cfg):
     s = _norm(carpeta)
-    e = _enfermedad(s, "tomate")
-    if re.search(r"miner|insect|uncategor|other|class 16", s):
-        return "tomate"   # plagas sin clase propia: solo cuentan como tomate para el router
+    if re.search(r"cercospora|miner|insect|uncategor|other|class 16", s):
+        return "tomate"   # sin clase propia (cercospora, minador, insectos): solo para el router
+    e = _enfermedad(s, "tomate")   # "Tomato Leaf Curl Virus" (begomovirus) va con el rizado amarillo
     return f"tomate_{e}" if e else "tomate"
 
 
@@ -79,6 +87,43 @@ def papa_indonesia(carpeta, cfg):
     if re.search(r"phyto?p?h?thora|late", s):   # la carpeta real se llama "Phytopthora"
         return "papa_tizon_tardio"
     return "papa"   # bacteria, fungi, nematode, pest, virus: sin equivalente exacto
+
+
+def maiz(carpeta, cfg):
+    s = _norm(carpeta)
+    if re.search(r"gray|grey|cercospora", s):
+        return "maiz_mancha_gris"
+    if "blight" in s:   # Northern Leaf Blight / Corn Leaf Blight
+        return "maiz_tizon_hoja"
+    if "rust" in s:
+        return "maiz_roya_comun"
+    if re.search(r"worm|spodoptera", s):   # armyworm, worm_affected_maize_leaves
+        return "maiz_gusano_cogollero"
+    if re.search(r"healthy|normal", s):
+        return "maiz_sana"
+    return "maiz"   # eyespot, streak, bacterial leaf streak: solo para el router
+
+
+def citricos(carpeta, cfg):
+    c, s = cfg["cultivo"], _norm(carpeta)
+    e = None
+    if "canker" in s:
+        e = "cancrosis"
+    elif re.search(r"greening|hlb|ha?u?nglongbing|yellow dragon", s):
+        e = "hlb"
+    elif "black spot" in s:
+        e = "mancha_negra"
+    elif "melanose" in s:
+        e = "melanosis"
+    elif "scab" in s:
+        e = "sarna"
+    elif "sooty" in s:
+        e = "fumagina"
+    elif re.search(r"leaf ?miner", s):
+        e = "minador"
+    elif "healthy" in s:
+        e = "sana"
+    return f"{c}_{e}" if e else c   # otras plagas y daños: solo para el router
 
 
 def solo_tomate(carpeta, cfg):
@@ -124,46 +169,6 @@ def no_planta(carpeta, cfg):
     if re.search(r"airplane|car|cat|dog|motorbike|person", s):
         return "no_planta"
     return None
-
-
-def maiz(carpeta, cfg):
-    s = _norm(carpeta)
-    if re.search(r"healthy|sana|sano|saludable", s):
-        return "maiz_sana"
-    if re.search(r"fall\s*armyworm|armyworm|spodoptera|cogollero|gusano|worm\s*affect", s):
-        return "maiz_gusano_cogollero"
-    if re.search(r"blight|tizon|turcicum|exserohilum", s):
-        return "maiz_tizon_hoja"
-    if re.search(r"rust|roya|puccinia", s):
-        return "maiz_roya_comun"
-    if re.search(r"gray\s*leaf|grey\s*leaf|cercospora|mancha\s*gris", s):
-        return "maiz_mancha_gris"
-    return "maiz"
-
-
-# ------------------------------------------------------------ certeza y regla no seguro
-MARGEN_MIN_MAIZ = 0.15
-PAR_CONFLICTO_MAIZ = ("maiz_gusano_cogollero", "maiz_tizon_hoja")
-
-
-def es_diagnostico_seguro(clase_predicha, p_vector, clases, umbral=0.5, margen_maiz=MARGEN_MIN_MAIZ):
-    """Evalúa si una predicción es concluyente o debe marcarse como 'no seguro'.
-
-    Para maíz: si la clase ganadora es 'maiz_gusano_cogollero' o 'maiz_tizon_hoja' y la
-    diferencia de probabilidades entre ambas es menor a margen_maiz (0.15), el resultado
-    se considera no concluyente por ambigüedad morfológica (daño mecánico/huecos vs necrosis).
-    Para otros cultivos o clases: rige únicamente el umbral de confianza mínimo.
-    """
-    conf = float(p_vector.max())
-    if conf < umbral:
-        return False, "confianza_insuficiente"
-    if clase_predicha in PAR_CONFLICTO_MAIZ and all(c in clases for c in PAR_CONFLICTO_MAIZ):
-        i_cog = clases.index("maiz_gusano_cogollero")
-        i_tiz = clases.index("maiz_tizon_hoja")
-        dif = abs(float(p_vector[i_cog]) - float(p_vector[i_tiz]))
-        if dif < margen_maiz:
-            return False, "ambiguedad_cogollero_tizon"
-    return True, None
 
 
 def etiqueta_para_modelo(etiqueta, modelo, clases):
