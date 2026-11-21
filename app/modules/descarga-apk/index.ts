@@ -46,8 +46,23 @@ export function estado(): EstadoDescarga {
   try { return modulo.estado() as EstadoDescarga } catch { return VACIO }
 }
 
-/** Abre el instalador del APK ya descargado. */
-export function instalar(): void { modulo?.instalar() }
+/** Abre el instalador del APK ya descargado. Devuelve 'ok', 'permiso_requerido', 'archivo_no_encontrado', 'no_lista' o 'error'. */
+export function instalar(): string {
+  if (!modulo?.instalar) return 'no_disponible'
+  try { return String(modulo.instalar()) } catch { return 'error' }
+}
+
+/** Comprueba si la app tiene permiso para instalar paquetes desconocidos. */
+export function puedeInstalar(): boolean {
+  if (!modulo?.puedeInstalar) return true
+  try { return !!modulo.puedeInstalar() } catch { return true }
+}
+
+/** Abre la pantalla de ajustes de Android para permitir instalar apps desconocidas. */
+export function abrirAjustesInstalacion(): boolean {
+  if (!modulo?.abrirAjustesInstalacion) return false
+  try { return !!modulo.abrirAjustesInstalacion() } catch { return false }
+}
 
 /** Disponible: true si el módulo nativo está cargado. */
 export const disponible = !!modulo

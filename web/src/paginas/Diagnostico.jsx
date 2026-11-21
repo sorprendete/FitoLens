@@ -1,4 +1,4 @@
-import { AlertTriangle, Bug, Camera, Check, CircleCheck, CircleHelp, Focus, Hand, Cpu, ImageUp, LocateFixed, MapPin, RotateCcw, ShieldAlert, Sun } from 'lucide-react'
+import { AlertTriangle, Bug, Camera, Check, ChevronDown, CircleCheck, CircleHelp, Focus, Hand, Cpu, ImageUp, LocateFixed, MapPin, RotateCcw, ShieldAlert, Sun } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { diagnosticar, versionModelos } from '../api/cliente'
 import Barra from '../componentes/Barra'
@@ -7,7 +7,7 @@ import Camara from '../componentes/Camara'
 import MapaCalor from '../componentes/MapaCalor'
 import Pasos from '../componentes/Pasos'
 import Voz from '../componentes/Voz'
-import { CULTIVOS, URGENCIA, esSana, infoClase } from '../datos/clases'
+import { CLASES, CULTIVOS, URGENCIA, esSana, infoClase } from '../datos/clases'
 import { PROVINCIAS } from '../datos/provincias'
 import { provinciaDe, reducir } from '../datos/utiles'
 
@@ -69,6 +69,7 @@ export default function Diagnostico() {
               <button className="btn grande brillo" onClick={() => setCamara(true)}><Camera />Tomar foto</button>
               <button className="btn grande sec" onClick={() => entrada.current.click()}><ImageUp />Subir foto</button>
             </div>
+            <QueDetecta />
             <div className="tarjeta ubicacion-tarjeta">
               <label htmlFor="prov" className="ubicacion-label">
                 <MapPin size={17} />
@@ -117,6 +118,51 @@ export default function Diagnostico() {
         </div>
       )}
     </section>
+  )
+}
+
+const ORDEN_CULTIVOS = ['cafe', 'cacao', 'papa', 'tomate', 'pimiento', 'maiz', 'limon', 'naranja']
+
+function QueDetecta() {
+  return (
+    <details className="tarjeta que-detecta">
+      <summary className="que-detecta-resumen">
+        <span>Qué detecta FitoLens</span>
+        <ChevronDown size={18} className="que-detecta-chevron" />
+      </summary>
+      <div className="que-detecta-contenido">
+        <p className="tenue pequeno que-detecta-intro">
+          FitoLens identifica 28 enfermedades y el estado sano en 8 cultivos:
+        </p>
+        <div className="que-detecta-grid">
+          {ORDEN_CULTIVOS.map((id) => {
+            const cult = CULTIVOS[id]
+            if (!cult) return null
+            const clasesCultivo = Object.entries(CLASES).filter(([k]) => k.startsWith(id + '_'))
+            return (
+              <div key={id} className="que-detecta-grupo" style={{ '--color-cultivo': cult.color }}>
+                <div className="que-detecta-grupo-cab">
+                  <span className="que-detecta-punto" />
+                  <h4>{cult.nombre}</h4>
+                  {cult.cientifico && <small className="tenue">{cult.cientifico}</small>}
+                </div>
+                <ul className="que-detecta-items">
+                  {clasesCultivo.map(([k, c]) => {
+                    const sana = esSana(k)
+                    return (
+                      <li key={k} className={sana ? 'es-sana' : ''}>
+                        {sana ? <Check size={14} /> : <span className="icono-enfermedad">•</span>}
+                        <span>{c.nombre}</span>
+                      </li>
+                    )
+                  })}
+                </ul>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </details>
   )
 }
 

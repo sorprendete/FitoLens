@@ -158,17 +158,47 @@ class DescargaService : Service() {
             ?: throw RuntimeException("No se pudo acceder al almacenamiento")
         if (!dir.exists()) dir.mkdirs()
 
+        // Limpiar APKs de versiones viejas
+        dir.listFiles()?.forEach { f ->
+            if (f.name.startsWith("FitoLens-") && f.name.endsWith(".apk") && f.name != "FitoLens-$version.apk") {
+                f.delete()
+            }
+        }
+
         val archivo = File(dir, "FitoLens-$version.apk")
         bytesDescargados = if (archivo.exists()) archivo.length() else 0L
 
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+        // Si ya existe y coincide sha256, no volver a descargarlo
+        if (archivo.exists() && bytesDescargados > 0 && sha256Esperado.isNotBlank()) {
+            if (calcularSha256(archivo).equals(sha256Esperado, ignoreCase = true)) {
+                desregistrarCallbackRed()
+                liberarLocks()
+                actualizarEstado("lista")
+                mostrarNotifLista()
+                return
+            }
+        }
+
+        var conn = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 30_000
             readTimeout = 30_000
             if (bytesDescargados > 0) setRequestProperty("Range", "bytes=$bytesDescargados-")
         }
 
         try {
-            val codigo = conn.responseCode
+            var codigo = conn.responseCode
+
+            // Si el servidor responde 416 (Range Not Satisfiable), reiniciar descarga limpia
+            if (codigo == 416) {
+                conn.disconnect()
+                archivo.delete()
+                bytesDescargados = 0L
+                conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = 30_000
+                    readTimeout = 30_000
+                }
+                codigo = conn.responseCode
+            }
 
             // Si el servidor no soporta Range, empezar de cero
             if (bytesDescargados > 0 && codigo == 200) {
@@ -252,14 +282,11 @@ class DescargaService : Service() {
             }
         }
 
-        // ¡Listo!
+        // ¡Listo! Dejar la notificación (la app o el usuario abrirán el instalador)
         desregistrarCallbackRed()
         liberarLocks()
         actualizarEstado("lista")
         mostrarNotifLista()
-
-        // Intentar abrir el instalador directamente
-        try { DescargaApkModule.abrirInstalador(this, version) } catch (_: Exception) {}
     }
 
     private fun calcularSha256(archivo: File): String {

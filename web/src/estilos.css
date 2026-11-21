@@ -103,6 +103,26 @@ input[type="date"]:focus-visible { border-color: var(--acento); box-shadow: 0 0 
 .ubicacion-btn { flex: none; white-space: nowrap; }
 .ubicacion-gps { margin: 10px 0 0; font-size: .84rem; font-weight: 600; color: var(--acento); text-align: left; }
 .ubicacion-ayuda { margin: 10px 0 0; line-height: 1.4; text-align: left; }
+
+/* Qué detecta FitoLens */
+.que-detecta { margin-top: 18px; text-align: left; }
+.que-detecta-resumen { display: flex; align-items: center; justify-content: space-between; gap: 12px; cursor: pointer; user-select: none; font-weight: 700; font-size: 1rem; color: var(--texto); list-style: none; }
+.que-detecta-resumen::-webkit-details-marker { display: none; }
+.que-detecta-chevron { color: var(--acento); transition: transform .25s ease; flex-shrink: 0; }
+.que-detecta[open] .que-detecta-chevron { transform: rotate(180deg); }
+.que-detecta-contenido { margin-top: 16px; border-top: 1px solid var(--borde); padding-top: 14px; animation: aparecer .25s ease; }
+.que-detecta-intro { margin-bottom: 14px; }
+.que-detecta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 14px; }
+.que-detecta-grupo { background: var(--fondo-2); border: 1px solid var(--borde); border-radius: var(--radio-s); padding: 12px 14px; border-top: 3px solid var(--color-cultivo, var(--acento)); }
+.que-detecta-grupo-cab { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.que-detecta-grupo-cab h4 { margin: 0; font-size: 1rem; color: var(--texto); }
+.que-detecta-grupo-cab small { font-style: italic; font-size: .78rem; }
+.que-detecta-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--color-cultivo, var(--acento)); }
+.que-detecta-items { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; font-size: .88rem; }
+.que-detecta-items li { display: flex; align-items: center; gap: 7px; color: var(--tenue); }
+.que-detecta-items li.es-sana { color: var(--ok); font-weight: 600; }
+.que-detecta-items li.es-sana svg { color: var(--ok); flex-shrink: 0; }
+.icono-enfermedad { color: var(--color-cultivo, var(--acento)); font-weight: bold; flex-shrink: 0; margin-left: 2px; margin-right: 2px; }
 .voz-select { min-height: 44px; border-radius: var(--radio-s); background: var(--sup); border: 1px solid var(--borde-2); color: var(--texto); padding: 0 12px; cursor: pointer; }
 .voz-select:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); outline: none; }
 

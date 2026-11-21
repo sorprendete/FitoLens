@@ -2,6 +2,7 @@ package expo.modules.descargaapk
 
 import android.content.Context
 import android.content.SharedPreferences
+import java.io.File
 
 /**
  * Almacena el estado de la descarga en SharedPreferences para que persista
@@ -34,11 +35,31 @@ object EstadoStore {
     /** Lee el estado actual como mapa listo para enviar a JS. */
     fun leer(ctx: Context): Map<String, Any?> {
         val p = prefs(ctx)
+        val estado = p.getString("estado", "inactiva") ?: "inactiva"
+        val version = p.getString("version", "") ?: ""
+
+        // Si el estado dice 'lista', comprobar que el archivo exista realmente y no esté vacío
+        if (estado == "lista") {
+            val dir = ctx.getExternalFilesDir("actualizaciones")
+            val archivo = if (dir != null && version.isNotBlank()) File(dir, "FitoLens-$version.apk") else null
+            if (archivo == null || !archivo.exists() || archivo.length() == 0L) {
+                // Estado 'lista' viejo o APK inexistente: limpiar estado
+                p.edit().putString("estado", "inactiva").apply()
+                return mapOf(
+                    "estado" to "inactiva",
+                    "bytes" to 0L,
+                    "total" to 0L,
+                    "version" to "",
+                    "error" to null
+                )
+            }
+        }
+
         return mapOf(
-            "estado" to (p.getString("estado", "inactiva") ?: "inactiva"),
+            "estado" to estado,
             "bytes" to p.getLong("bytes", 0L),
             "total" to p.getLong("total", 0L),
-            "version" to (p.getString("version", "") ?: ""),
+            "version" to version,
             "error" to (p.getString("error", "")?.ifBlank { null })
         )
     }

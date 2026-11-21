@@ -15,7 +15,7 @@ type Info = { nombre: string; agente: string; consejo: string; urgencia: Urgenci
 const I = (nombre: string, agente: string, consejo: string, urgencia: Urgencia = 'media'): Info => ({ nombre, agente, consejo, urgencia })
 const SANA = I('Planta sana', 'Ninguno', 'Sigue con el monitoreo semanal y el manejo preventivo.', 'ninguna')
 
-const CLASES: Record<string, Info> = {
+export const CLASES: Record<string, Info> = {
   cafe_sana: SANA,
   cafe_roya: I('Roya amarilla', 'Hemileia vastatrix', 'Retira hojas muy afectadas, regula la sombra y aplica un fungicida cúprico o sistémico registrado. Avisa a tus vecinos: se dispersa con el viento.', 'alta'),
   cafe_ojo_de_gallo: I('Ojo de gallo', 'Mycena citricolor', 'Reduce la sombra y la humedad, poda para ventilar y aplica un fungicida cúprico registrado.'),

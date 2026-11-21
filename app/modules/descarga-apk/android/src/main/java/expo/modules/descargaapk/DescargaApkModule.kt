@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import java.io.File
@@ -66,12 +67,33 @@ class DescargaApkModule : Module() {
             else mapOf("estado" to "inactiva", "bytes" to 0L, "total" to 0L, "version" to "")
         }
 
-        Function("instalar") {
+        Function("puedeInstalar") {
             val ctx = appContext.reactContext
-            if (ctx != null) {
-                val datos = EstadoStore.leer(ctx)
-                val version = datos["version"] as? String
-                if (datos["estado"] == "lista" && version != null) abrirInstalador(ctx, version)
+            if (ctx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                ctx.packageManager.canRequestPackageInstalls()
+            } else {
+                true
+            }
+        }
+
+        Function("abrirAjustesInstalacion") {
+            val ctx = appContext.reactContext ?: return@Function false
+            abrirAjustesPermiso(ctx)
+        }
+
+        Function("instalar") {
+            val ctx = appContext.reactContext ?: return@Function "sin_contexto"
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !ctx.packageManager.canRequestPackageInstalls()) {
+                abrirAjustesPermiso(ctx)
+                return@Function "permiso_requerido"
+            }
+            val datos = EstadoStore.leer(ctx)
+            val version = datos["version"] as? String
+            if (datos["estado"] == "lista" && !version.isNullOrBlank()) {
+                val ok = abrirInstalador(ctx, version)
+                if (ok) "ok" else "archivo_no_encontrado"
+            } else {
+                "no_lista"
             }
         }
     }
@@ -83,11 +105,32 @@ class DescargaApkModule : Module() {
     }
 
     companion object {
+        fun abrirAjustesPermiso(ctx: Context): Boolean {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${ctx.packageName}")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                return try {
+                    ctx.startActivity(intent)
+                    true
+                } catch (_: Exception) {
+                    try {
+                        ctx.startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS).apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) })
+                        true
+                    } catch (_: Exception) {
+                        false
+                    }
+                }
+            }
+            return false
+        }
+
         /** Abre el instalador de Android para el APK descargado. */
-        fun abrirInstalador(ctx: Context, version: String) {
-            val dir = ctx.getExternalFilesDir("actualizaciones") ?: return
+        fun abrirInstalador(ctx: Context, version: String): Boolean {
+            val dir = ctx.getExternalFilesDir("actualizaciones") ?: return false
             val archivo = File(dir, "FitoLens-$version.apk")
-            if (!archivo.exists()) return
+            if (!archivo.exists() || archivo.length() == 0L) return false
 
             val authority = "${ctx.packageName}.descargaapk.fileprovider"
             val uri: Uri = FileProvider.getUriForFile(ctx, authority, archivo)
@@ -96,7 +139,12 @@ class DescargaApkModule : Module() {
                 setDataAndType(uri, "application/vnd.android.package-archive")
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
-            ctx.startActivity(intent)
+            return try {
+                ctx.startActivity(intent)
+                true
+            } catch (e: Exception) {
+                false
+            }
         }
     }
 }

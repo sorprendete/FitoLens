@@ -35,10 +35,10 @@ export async function buscarActualizacion(): Promise<Novedad | null> {
 export async function instalarActualizacion(novedad: Novedad) {
   // Plan A: módulo nativo de descarga en segundo plano
   if (moduloDisponible) {
-    // Pedir permiso de notificaciones en Android 13+ (API 33+)
+    // Pedir permiso de notificaciones en Android 13+ (API 33+) sin bloquear la descarga
     if (Platform.OS === 'android' && (Platform.Version as number) >= 33) {
       try {
-        await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS)
+        PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS).catch(() => {})
       } catch { /* si no lo concede, la descarga funciona igual pero sin notificación */ }
     }
     iniciarDescarga(APK, novedad.version, novedad.sha256)

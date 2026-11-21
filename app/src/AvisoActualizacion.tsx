@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native'
 import { C } from './tema'
 import { Novedad, VERSION_APP, buscarActualizacion, esMayor, instalarActualizacion } from './actualizacion'
-import { disponible, escuchar, estado as consultarEstado, pausar, reanudar, cancelar, instalar, type EstadoDescarga } from '../modules/descarga-apk'
+import { disponible, escuchar, estado as consultarEstado, pausar, reanudar, cancelar, instalar, puedeInstalar, type EstadoDescarga } from '../modules/descarga-apk'
 
 const CADA = 60 * 60 * 1000 // como mucho una consulta por hora
 
@@ -12,6 +12,7 @@ export default function AvisoActualizacion() {
   const [nueva, setNueva] = useState<Novedad | null>(null)
   const [ed, setEd] = useState<EstadoDescarga | null>(null)
   const [oculto, setOculto] = useState(false)
+  const [faltaPermiso, setFaltaPermiso] = useState(false)
   const ultima = useRef(0)
 
   // Buscar actualizaciones al abrir / volver
@@ -37,9 +38,19 @@ export default function AvisoActualizacion() {
 
     const desuscribir = escuchar((e) => {
       setEd(vigente(e) ? e : null)
+      if (e.estado !== 'lista') setFaltaPermiso(false)
     })
     return desuscribir
   }, [])
+
+  // Al volver de ajustes de Android, revalidar permiso
+  useEffect(() => {
+    if (!faltaPermiso) return
+    const sub = AppState.addEventListener('change', (e) => {
+      if (e === 'active' && puedeInstalar()) setFaltaPermiso(false)
+    })
+    return () => sub.remove()
+  }, [faltaPermiso])
 
   if (oculto && !ed) return null
   if (!nueva && !ed) return null
@@ -83,9 +94,15 @@ export default function AvisoActualizacion() {
         )
         break
       case 'lista':
-        texto = 'Lista para instalar'
+        texto = faltaPermiso
+          ? 'Falta permiso: activa "Permitir desde esta fuente" y toca Instalar.'
+          : 'Lista para instalar'
         botones = (
-          <Pressable onPress={instalar} style={s.boton}><Text style={s.botonTxt}>Instalar</Text></Pressable>
+          <Pressable onPress={() => {
+            const res = instalar()
+            if (res === 'permiso_requerido') setFaltaPermiso(true)
+            else if (res === 'archivo_no_encontrado' || res === 'no_lista') { setEd(null); setFaltaPermiso(false) }
+          }} style={s.boton}><Text style={s.botonTxt}>Instalar</Text></Pressable>
         )
         break
       case 'error':
@@ -109,7 +126,10 @@ export default function AvisoActualizacion() {
 
   // ── Sin descarga activa: ofrecer actualizar ──────────────────────────
   if (!nueva) return null
-  const actualizar = () => instalarActualizacion(nueva)
+  const actualizar = () => {
+    setFaltaPermiso(false)
+    instalarActualizacion(nueva)
+  }
 
   return (
     <View style={s.caja}>

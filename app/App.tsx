@@ -13,6 +13,7 @@ import { enLinea, enviar } from './src/servidor'
 import { Fila, borrar, guardar, listar, pendientes, sincronizar, sincronizarSola } from './src/historial'
 import Cuenta from './src/Cuenta'
 import AvisoActualizacion from './src/AvisoActualizacion'
+import QueDetecta from './src/QueDetecta'
 import { cargarCuenta, cuentaActual, provinciaActual } from './src/cuenta'
 
 type Vista = 'diagnosticar' | 'historial' | 'parcelas' | 'cuenta'
@@ -86,6 +87,7 @@ function Diagnosticar() {
           <View style={s.fila}>{Object.entries(CULTIVOS).map(([k, c]) => <Text key={k} style={[s.etiqueta, { color: c.color, borderColor: c.color + '55' }]}>{c.nombre}</Text>)}</View>
         </View>
       )}
+      {!foto && <QueDetecta />}
       {!foto && <GuiaFoto />}
       {foto && <VisionIA foto={foto} proporcion={proporcion} vision={vision} cargando={cargando} />}
       <View style={s.fila}>

@@ -375,6 +375,9 @@ export function huecosMordedura(
   let siluetaEval = llenaOrig
   let huecosRaw: Uint8Array
   let areaHoja = 0
+  let labs = new Float32Array(0)
+  let hsvs = new Float32Array(0)
+  let nPix = 0
 
   if (!rgb) {
     for (let i = 0; i < n * n; i++) if (llenaOrig[i]) areaHoja++
@@ -399,11 +402,11 @@ export function huecosMordedura(
     for (let i = 0; i < n * n; i++) if (siluetaEval[i]) areaHoja++
     if (areaHoja < 100) return { cantidad: 0, fraccion: 0, fuerte: false }
 
-    const labs = new Float32Array(n * n * 3)
-    const hsvs = new Float32Array(n * n * 3)
+    labs = new Float32Array(n * n * 3)
+    hsvs = new Float32Array(n * n * 3)
     const tejidos = new Uint8Array(n * n)
     const verdes = new Uint8Array(n * n)
-    const nPix = n * n
+    nPix = n * n
 
     for (let i = 0; i < nPix; i++) {
       const r = rgb[i], g = rgb[nPix + i], b = rgb[2 * nPix + i]
