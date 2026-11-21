@@ -64,7 +64,7 @@ export default function Shell({ ruta, children }) {
           </div>
         </header>
         <main key={ruta.id} className="pagina">{children}</main>
-        <footer className="pie">FitoLens · EXPOFERIA FISI 2026 · Universidad Nacional de San Martín, Tarapoto</footer>
+        <footer className="pie">FitoLens · EXPOFERIA FISI 2026 · Universidad Nacional de San Martín, Tarapoto · <a href="/privacidad/">Política de privacidad</a></footer>
       </div>
 
       <nav className="nav-movil" aria-label="Accesos rápidos">
