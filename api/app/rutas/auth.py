@@ -11,6 +11,7 @@ from app.rutas.dependencias import usuario_requerido
 from app.seguridad import auditoria
 from app.seguridad.claves import crear_token, hashear, verificar
 from app.seguridad.fuerza_bruta import esta_bloqueado
+from app.seguridad.limites import limitador
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,6 +50,11 @@ def autenticar(datos: Login, request: Request, sesion: Session, detalle: str | N
 
 @router.post("/registro", response_model=Token, status_code=201)
 def registro(datos: Registro, request: Request, sesion: Session = Depends(db)):
+    ip = auditoria.ip_cliente(request)
+    if not limitador.permitir(f"registro:{ip}", 10):
+        auditoria.registrar(sesion, request, "registro", "bloqueado",
+                            detalle="Demasiados intentos de registro.")
+        raise HTTPException(429, "Demasiados intentos de registro. Espera un minuto.")
     if not ajustes().registro_abierto:
         raise HTTPException(403, "El registro está cerrado.")
     email = datos.email.lower()

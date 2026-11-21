@@ -19,11 +19,21 @@ def usuario_opcional(cred: HTTPAuthorizationCredentials | None = Depends(_bearer
     if cred is None:
         return None
     datos = leer_token(cred.credentials)
-    usuario = sesion.get(Usuario, int(datos["sub"])) if datos else None
+    if not datos or "sub" not in datos:
+        raise HTTPException(401, "Sesión inválida o vencida.")
+    try:
+        sub_id = int(datos["sub"])
+    except (ValueError, TypeError):
+        raise HTTPException(401, "Sesión inválida o vencida.")
+    usuario = sesion.get(Usuario, sub_id)
     if usuario is None or not usuario.activo:
         raise HTTPException(401, "Sesión inválida o vencida.")
     if datos.get("dis"):  # token de la app: el dispositivo tiene que seguir vinculado
-        d = sesion.get(Dispositivo, int(datos["dis"]))
+        try:
+            dis_id = int(datos["dis"])
+        except (ValueError, TypeError):
+            raise HTTPException(401, "Este teléfono ya no está vinculado. Vuelve a iniciar sesión.")
+        d = sesion.get(Dispositivo, dis_id)
         if d is None or d.revocado or d.usuario_id != usuario.id:
             raise HTTPException(401, "Este teléfono ya no está vinculado. Vuelve a iniciar sesión.")
         d.ultimo_uso = ahora()

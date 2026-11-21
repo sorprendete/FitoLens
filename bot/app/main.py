@@ -35,7 +35,12 @@ async def elegir_provincia(update: Update, context: ContextTypes.DEFAULT_TYPE) -
 
 async def foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     msj = update.effective_message
+    if not msj:
+        return
     archivo = msj.photo[-1] if msj.photo else msj.document  # la foto más grande, o la imagen enviada como archivo
+    if not archivo:
+        await msj.reply_text(textos.SOLO_FOTOS, parse_mode=ParseMode.HTML)
+        return
     if msj.document and not (msj.document.mime_type or "").startswith("image/"):
         await msj.reply_text(textos.NO_ES_IMAGEN)
         return
@@ -45,9 +50,16 @@ async def foto(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await context.bot.send_chat_action(msj.chat_id, ChatAction.TYPING)
     espera = await msj.reply_text(textos.ANALIZANDO)
     datos = bytes(await (await archivo.get_file()).download_as_bytearray())
+    if len(datos) == 0:
+        await espera.edit_text("El archivo enviado está vacío.")
+        return
+    if len(datos) > MAX_BYTES:
+        await espera.edit_text("La foto pesa demasiado (máximo 8 MB).")
+        return
     provincia = context.user_data.get("provincia")
+    user_id = update.effective_user.id if update.effective_user else msj.chat_id
     try:
-        r = await context.bot_data["api"].diagnosticar(datos, update.effective_user.id, provincia)
+        r = await context.bot_data["api"].diagnosticar(datos, user_id, provincia)
     except ErrorApi as e:
         await espera.edit_text(f"😕 {e}")
         return
@@ -84,8 +96,9 @@ async def enviar_reporte(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     await consulta.answer(textos.GENERANDO_REPORTE)
     await context.bot.send_chat_action(consulta.message.chat_id, ChatAction.UPLOAD_DOCUMENT)
+    user_id = update.effective_user.id if update.effective_user else (consulta.message.chat_id if consulta.message else 0)
     try:
-        pdf = await context.bot_data["api"].reporte(id_, datos, update.effective_user.id)
+        pdf = await context.bot_data["api"].reporte(id_, datos, user_id)
     except ErrorApi as e:
         await consulta.message.reply_text(f"😕 {e}")
         return

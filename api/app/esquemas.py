@@ -50,13 +50,13 @@ class UsuarioSalida(BaseModel):
 
 class Login(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=1, max_length=200)
+    password: str = Field(min_length=1, max_length=72)
 
 
 class Registro(BaseModel):
     email: EmailStr
     nombre: str = Field(min_length=2, max_length=120)
-    password: str = Field(min_length=8, max_length=200)
+    password: str = Field(min_length=8, max_length=72)
 
 
 class Token(BaseModel):

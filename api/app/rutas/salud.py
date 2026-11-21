@@ -25,7 +25,7 @@ def salud(registro: Registro = Depends(registro_modelos), sesion: Session = Depe
         "modelos_release": ajustes().modelos_version or None,
         # True si hay algún modelo de prueba (crear_modelos_falsos.py): sus diagnósticos no son reales.
         "modelos_de_prueba": any("falso" in m.manifest.version for m in registro.modelos.values()),
-        "errores_modelos": registro.errores,
+        "errores_modelos": {k: "Error de inicialización" for k in registro.errores},
     }
     # 200 aunque falten modelos: el contenedor está vivo; la web muestra el aviso.
     return JSONResponse(cuerpo, status_code=200 if base_ok else 503)

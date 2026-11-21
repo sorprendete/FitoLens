@@ -19,6 +19,7 @@ from app.ia import imagen as lector
 from app.rutas.dependencias import usuario_requerido
 from app.rutas.diagnostico import _guardar
 from app.seguridad import auditoria
+from app.seguridad.limites import limitador
 
 router = APIRouter(tags=["sincronizar"])
 
@@ -58,6 +59,8 @@ async def sincronizar(
     usuario: Usuario = Depends(usuario_requerido),
     sesion: Session = Depends(db),
 ):
+    if not limitador.permitir(f"sincronizar:{usuario.id}", 120):
+        raise HTTPException(429, "Demasiadas sincronizaciones seguidas. Espera un minuto.")
     id_cliente = id_cliente.lower()
     previo = sesion.scalar(select(Diagnostico).where(Diagnostico.id_cliente == id_cliente))
     if previo is not None:

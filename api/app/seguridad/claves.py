@@ -7,15 +7,22 @@ import jwt
 from app.core.config import ajustes
 
 ALGORITMO = "HS256"
+MAX_PASSWORD_BYTES = 72
 
 
 def hashear(password: str) -> str:
-    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+    raw = password.encode()
+    if len(raw) > MAX_PASSWORD_BYTES:
+        raise ValueError(f"La contraseña no puede superar los {MAX_PASSWORD_BYTES} bytes.")
+    return bcrypt.hashpw(raw, bcrypt.gensalt()).decode()
 
 
 def verificar(password: str, hash_: str) -> bool:
     try:
-        return bcrypt.checkpw(password.encode(), hash_.encode())
+        raw = password.encode()
+        if len(raw) > MAX_PASSWORD_BYTES:
+            return False
+        return bcrypt.checkpw(raw, hash_.encode())
     except ValueError:
         return False
 
