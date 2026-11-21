@@ -115,21 +115,60 @@ export const yo = async () => usuarioDemo
 
 const PROV_IDS = PROVINCIAS.map((p) => p.id)
 const TODAS = ['cafe_roya', 'cafe_sana', 'cafe_ojo_de_gallo', 'cacao_monilia', 'cacao_sana', 'cacao_mazorca_negra', 'papa_tizon_tardio', 'tomate_tizon_temprano', 'tomate_sana']
-export async function historial() {
+
+let itemsHistorialMock = null
+function obtenerHistorialMock() {
+  if (!itemsHistorialMock) {
+    itemsHistorialMock = Array.from({ length: 64 }, (_, i) => {
+      const r = (i * 9301 + 49297) % 233280 / 233280
+      const clase = TODAS[i % TODAS.length]
+      const estado = r < 0.08 ? 'rechazada' : r < 0.2 ? 'no_concluyente' : 'diagnostico'
+      const tieneParcela = i % 4 === 0
+      return {
+        id: 1000 - i, creado: new Date(Date.now() - i * 5.3 * 36e5).toISOString(),
+        cultivo: estado === 'rechazada' ? null : clase.split('_')[0], estado,
+        clase: estado === 'rechazada' ? null : clase, confianza: estado === 'no_concluyente' ? 0.45 + r : 0.8 + r * 0.19,
+        provincia: PROV_IDS[i % PROV_IDS.length],
+        origen: i % 3 === 0 ? 'app' : 'web',
+        parcela_id: tieneParcela ? 1 : null,
+        parcela_nombre: tieneParcela ? 'Cafetal La Loma' : null,
+      }
+    })
+  }
+  return itemsHistorialMock
+}
+
+export async function historial({ limite = 64, sin_parcela = false } = {}) {
   await espera(300)
-  const items = Array.from({ length: 64 }, (_, i) => {
-    const r = (i * 9301 + 49297) % 233280 / 233280
-    const clase = TODAS[i % TODAS.length]
-    const estado = r < 0.08 ? 'rechazada' : r < 0.2 ? 'no_concluyente' : 'diagnostico'
-    return {
-      id: 1000 - i, creado: new Date(Date.now() - i * 5.3 * 36e5).toISOString(),
-      cultivo: estado === 'rechazada' ? null : clase.split('_')[0], estado,
-      clase: estado === 'rechazada' ? null : clase, confianza: estado === 'no_concluyente' ? 0.45 + r : 0.8 + r * 0.19,
-      provincia: PROV_IDS[i % PROV_IDS.length],
-      origen: i % 3 === 0 ? 'app' : 'web',
-    }
-  })
-  return { items }
+  let items = [...obtenerHistorialMock()]
+  if (sin_parcela) items = items.filter((x) => !x.parcela_id)
+  return { items: items.slice(0, limite) }
+}
+
+export async function borrarDiagnostico(id) {
+  await espera(100)
+  const lista = obtenerHistorialMock()
+  const idx = lista.findIndex((x) => x.id === Number(id))
+  if (idx !== -1) lista.splice(idx, 1)
+  return null
+}
+
+export function asignarParcelaMock(diagId, parcelaId, parcelaNombre) {
+  const lista = obtenerHistorialMock()
+  const item = lista.find((x) => x.id === Number(diagId))
+  if (item) {
+    item.parcela_id = Number(parcelaId)
+    item.parcela_nombre = parcelaNombre
+  }
+}
+
+export function quitarParcelaMock(diagId) {
+  const lista = obtenerHistorialMock()
+  const item = lista.find((x) => x.id === Number(diagId))
+  if (item) {
+    item.parcela_id = null
+    item.parcela_nombre = null
+  }
 }
 
 export const resumen = async () => ({ usuarios: 48, analisis: 1264, sanos: 402, enfermos: 701, no_concluyentes: 112, rechazadas: 49, logins_fallidos_24h: 17, bloqueos_24h: 2 })

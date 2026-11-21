@@ -1,4 +1,5 @@
 // Parcelas de demostración (solo con VITE_MODO_DEMO=true). Se guardan en memoria mientras la página esté abierta.
+import { asignarParcelaMock, quitarParcelaMock } from './mocks'
 const dia = (n) => new Date(Date.now() - n * 864e5).toISOString()
 let sig = 10
 const lista = [
@@ -32,3 +33,19 @@ export async function visita(id, d) {
   buscar(id).historial.push(v); return v
 }
 export async function borrarVisita(id, vid) { const h = buscar(id).historial; h.splice(h.findIndex((v) => v.id === vid), 1); return null }
+export async function agregarDiagnostico(id, d) {
+  const p = buscar(id)
+  if (!p) throw new Error('Parcela no encontrada')
+  const v = { id: ++sig, fecha: dia(0), nota: d.nota || null, tratamiento: null, clase: d.clase || null, confianza: d.confianza || null, estado: d.estado || 'diagnostico', diagnostico_id: d.diagnostico_id, severidad: d.severidad ?? 2 }
+  p.historial.push(v)
+  if (d.diagnostico_id) asignarParcelaMock(d.diagnostico_id, p.id, p.nombre)
+  return v
+}
+export async function quitarDiagnostico(id, diagId) {
+  const p = buscar(id)
+  if (!p) throw new Error('Parcela no encontrada')
+  const idx = p.historial.findIndex((v) => v.diagnostico_id === Number(diagId))
+  if (idx !== -1) p.historial.splice(idx, 1)
+  quitarParcelaMock(diagId)
+  return null
+}

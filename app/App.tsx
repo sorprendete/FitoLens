@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react'
-import { FlatList, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Alert, FlatList, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { StatusBar } from 'expo-status-bar'
 import * as ImagePicker from 'expo-image-picker'
@@ -10,8 +10,9 @@ import { CULTIVOS, esSana, infoClase } from './src/catalogo'
 import { Resultado, Vision, diagnosticarLocal, hayIaLocal } from './src/ia'
 import VisionIA from './src/VisionIA'
 import { Analizando, GuiaFoto, TarjetaResultado } from './src/Resultado'
-import { enLinea, enviar } from './src/servidor'
-import { Fila, borrar, guardar, listar, pendientes, sincronizar, sincronizarSola } from './src/historial'
+import { agregarDiagnosticoAParcelaRemota, borrarDiagnosticoRemoto, enLinea, enviar, quitarDiagnosticoDeParcelaRemota } from './src/servidor'
+import { Fila, asignarParcela, borrar, guardar, listar, pendientes, sincronizar, sincronizarSola } from './src/historial'
+import { agregarDiagnosticoAParcela, listarParcelas, quitarDiagnosticoDeParcela } from './src/parcelas'
 import Cuenta from './src/Cuenta'
 import AvisoActualizacion from './src/AvisoActualizacion'
 import QueDetecta from './src/QueDetecta'
@@ -269,47 +270,429 @@ function Diagnosticar({ onIrAMisCultivos }: { onIrAMisCultivos: () => void }) {
 
 function Historial() {
   const { colores: C } = useTema()
+  const { cultivosInstalados } = useCultivosInstalados()
   const [filas, setFilas] = useState<Fila[]>([])
+  const [mapaParcelas, setMapaParcelas] = useState<Record<number, string>>({})
   const [pend, setPend] = useState(0)
   const [aviso, setAviso] = useState<string | null>(null)
   const [enviando, setEnviando] = useState(false)
-  const cargar = useCallback(() => { setFilas(listar()); setPend(pendientes()) }, [])
+
+  // Filtros y búsqueda
+  const [q, setQ] = useState('')
+  const [cultivoSel, setCultivoSel] = useState<string>('todos')
+  const [estadoSel, setEstadoSel] = useState<'todos' | 'enferma' | 'sana' | 'no_concluyente'>('todos')
+  const [urgenciaSel, setUrgenciaSel] = useState<string>('todas')
+  const [fechaSel, setFechaSel] = useState<'todo' | 'hoy' | '7dias' | '30dias'>('todo')
+  const [ordenReciente, setOrdenReciente] = useState(true)
+
+  const cargar = useCallback(() => {
+    try {
+      setFilas(listar())
+      setPend(pendientes())
+      const ps = listarParcelas()
+      const m: Record<number, string> = {}
+      for (const p of ps) m[p.id] = p.nombre
+      setMapaParcelas(m)
+    } catch {
+      setFilas([])
+      setPend(0)
+      setMapaParcelas({})
+    }
+  }, [])
   useEffect(cargar, [cargar])
+
+  const abrirOpciones = (f: Fila) => {
+    const opciones: { text: string; style?: 'default' | 'cancel' | 'destructive'; onPress?: () => void }[] = []
+
+    if (f.parcela_id) {
+      opciones.push({
+        text: 'Quitar de la parcela',
+        onPress: () => quitarDeParcelaAccion(f),
+      })
+    } else {
+      opciones.push({
+        text: 'Agregar a parcela',
+        onPress: () => agregarAParcelaAccion(f),
+      })
+    }
+
+    opciones.push({
+      text: 'Borrar',
+      style: 'destructive',
+      onPress: () => borrarAccion(f),
+    })
+
+    opciones.push({
+      text: 'Cancelar',
+      style: 'cancel',
+    })
+
+    Alert.alert('Opciones del diagnóstico', 'Elige una acción:', opciones)
+  }
+
+  const borrarAccion = (f: Fila) => {
+    Alert.alert(
+      'Borrar diagnóstico',
+      'Se borrara este diagnostico. No se puede deshacer.',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Borrar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              borrar(f.id)
+              if (f.parcela_id) {
+                quitarDiagnosticoDeParcela(f.parcela_id, f.id)
+              }
+              if (cuentaActual() && (await enLinea()) && f.servidor_id) {
+                await borrarDiagnosticoRemoto(f.servidor_id).catch(() => {})
+              }
+            } catch {}
+            cargar()
+          },
+        },
+      ]
+    )
+  }
+
+  const quitarDeParcelaAccion = async (f: Fila) => {
+    try {
+      const pid = f.parcela_id
+      asignarParcela(f.id, null)
+      if (pid) {
+        quitarDiagnosticoDeParcela(pid, f.id)
+      }
+      if (cuentaActual() && (await enLinea()) && f.servidor_id && pid) {
+        await quitarDiagnosticoDeParcelaRemota(pid, f.servidor_id).catch(() => {})
+      }
+    } catch {}
+    cargar()
+  }
+
+  const agregarAParcelaAccion = (f: Fila) => {
+    try {
+      const misParcelas = listarParcelas()
+      if (!misParcelas.length) {
+        Alert.alert('Sin parcelas', 'Aún no registras parcelas. Crea una en la sección Parcelas.')
+        return
+      }
+      Alert.alert(
+        'Agregar a parcela',
+        'Selecciona la parcela a la que deseas vincular este diagnóstico:',
+        [
+          ...misParcelas.map((p) => ({
+            text: p.nombre,
+            onPress: async () => {
+              try {
+                asignarParcela(f.id, p.id)
+                agregarDiagnosticoAParcela(p.id, f.id, f, f.foto)
+                if (cuentaActual() && (await enLinea()) && f.servidor_id) {
+                  await agregarDiagnosticoAParcelaRemota(p.id, f.servidor_id).catch(() => {})
+                }
+              } catch {}
+              cargar()
+            },
+          })),
+          { text: 'Cancelar', style: 'cancel' },
+        ]
+      )
+    } catch {}
+  }
 
   const sinc = async () => {
     setEnviando(true); setAviso(null)
-    try { setAviso(`${await sincronizar()} diagnósticos enviados al servidor.`) } catch (e: any) { setAviso(e?.message ?? 'No se pudo sincronizar.') }
-    finally { setEnviando(false); cargar() }
+    try {
+      setAviso(`${await sincronizar()} diagnósticos enviados al servidor.`)
+    } catch (e: any) {
+      setAviso(e?.message ?? 'No se pudo sincronizar.')
+    } finally {
+      setEnviando(false); cargar()
+    }
+  }
+
+  // Filtrado reactivo optimizado en memoria
+  const filasFiltradas = useMemo(() => {
+    const qNorm = q.trim().toLowerCase()
+    const ahora = Date.now()
+    const hoy = new Date()
+
+    const resultado = filas.filter((f) => {
+      // 1. Cultivo instalado o seleccionado
+      if (cultivoSel !== 'todos' && f.cultivo !== cultivoSel) return false
+
+      // 2. Estado (Enferma / Sana / No concluyente)
+      if (estadoSel !== 'todos') {
+        const esSanaBool = f.clase ? esSana(f.clase) : false
+        if (estadoSel === 'sana') {
+          if (f.estado !== 'diagnostico' || !f.clase || !esSanaBool) return false
+        } else if (estadoSel === 'enferma') {
+          if (f.estado !== 'diagnostico' || !f.clase || esSanaBool) return false
+        } else if (estadoSel === 'no_concluyente') {
+          if (f.estado === 'diagnostico' && f.clase) return false
+        }
+      }
+
+      // 3. Nivel de urgencia
+      if (urgenciaSel !== 'todas') {
+        const urg = f.clase ? infoClase(f.clase, f.etiqueta).urgencia : 'ninguna'
+        if (urg !== urgenciaSel) return false
+      }
+
+      // 4. Rango de fecha
+      if (fechaSel !== 'todo') {
+        const d = new Date(f.fecha)
+        if (fechaSel === 'hoy') {
+          if (d.getDate() !== hoy.getDate() || d.getMonth() !== hoy.getMonth() || d.getFullYear() !== hoy.getFullYear()) return false
+        } else if (fechaSel === '7dias') {
+          if (ahora - d.getTime() > 7 * 864e5) return false
+        } else if (fechaSel === '30dias') {
+          if (ahora - d.getTime() > 30 * 864e5) return false
+        }
+      }
+
+      // 5. Búsqueda por texto (enfermedad, cultivo, provincia, notas)
+      if (qNorm) {
+        const enf = f.clase ? infoClase(f.clase, f.etiqueta).nombre.toLowerCase() : (f.estado === 'rechazada' ? 'foto no válida' : 'no concluyente')
+        const cult = (CULTIVOS[f.cultivo ?? '']?.nombre ?? f.cultivo ?? '').toLowerCase()
+        const prov = (f.provincia ?? '').toLowerCase()
+        const motivo = (f.motivo ?? '').toLowerCase()
+        const nota = ((f as any).nota ?? (f as any).notas ?? f.error ?? '').toLowerCase()
+        const coincide = enf.includes(qNorm) || cult.includes(qNorm) || prov.includes(qNorm) || motivo.includes(qNorm) || nota.includes(qNorm)
+        if (!coincide) return false
+      }
+
+      return true
+    })
+
+    // Orden por fecha
+    resultado.sort((a, b) => {
+      const tA = new Date(a.fecha).getTime() || a.id
+      const tB = new Date(b.fecha).getTime() || b.id
+      return ordenReciente ? tB - tA : tA - tB
+    })
+
+    return resultado
+  }, [filas, q, cultivoSel, estadoSel, urgenciaSel, fechaSel, ordenReciente])
+
+  const hayFiltros = q.trim() !== '' || cultivoSel !== 'todos' || estadoSel !== 'todos' || urgenciaSel !== 'todas' || fechaSel !== 'todo' || !ordenReciente
+
+  const quitarFiltros = () => {
+    setQ('')
+    setCultivoSel('todos')
+    setEstadoSel('todos')
+    setUrgenciaSel('todas')
+    setFechaSel('todo')
+    setOrdenReciente(true)
   }
 
   return (
     <FlatList
       contentContainerStyle={s.contenido}
-      data={filas}
+      data={filasFiltradas}
       keyExtractor={(f) => String(f.id)}
       ListHeaderComponent={
-        <View style={{ gap: 8, marginBottom: 6 }}>
+        <View style={{ gap: 10, marginBottom: 8 }}>
           <Boton texto={enviando ? 'Enviando…' : `Sincronizar (${pend} pendientes)`} principal onPress={sinc} desactivado={enviando || pend === 0} />
           <Text style={[s.tenue, { color: C.tenue }]}>{cuentaActual() ? 'Con tu cuenta, se suben solos cuando hay internet y los ves en la web.' : 'Opcional: con internet, tus fotos ayudan al mapa de brotes de San Martín. Inicia sesión en Cuenta para verlos también en la web.'}</Text>
           {aviso && <Text style={{ color: C.acento }}>{aviso}</Text>}
+
+          {/* Barra de búsqueda por texto */}
+          <View style={[s.cajaBusqueda, { backgroundColor: C.fondo2, borderColor: C.borde2 }]}>
+            <Text style={{ fontSize: 16 }}>🔍</Text>
+            <TextInput
+              style={[s.inputBusqueda, { color: C.texto }]}
+              value={q}
+              onChangeText={setQ}
+              placeholder="Buscar enfermedad, cultivo, provincia, notas…"
+              placeholderTextColor={C.tenue}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            {q.length > 0 && (
+              <Pressable onPress={() => setQ('')} hitSlop={8} style={{ padding: 4 }}>
+                <Text style={{ color: C.tenue, fontSize: 14, fontWeight: '700' }}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* Filtros: Cultivo */}
+          <View style={s.grupoFiltro}>
+            <Text style={[s.filtroTitulo, { color: C.tenue }]}>Cultivo:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filaChips}>
+              <Pressable
+                onPress={() => setCultivoSel('todos')}
+                style={[s.chipFiltro, { borderColor: C.borde2, backgroundColor: C.fondo2 }, cultivoSel === 'todos' && { borderColor: C.acento, backgroundColor: C.acento + '22' }]}
+              >
+                <Text style={[s.chipFiltroTxt, { color: cultivoSel === 'todos' ? C.acento : C.texto }]}>Todos</Text>
+              </Pressable>
+              {cultivosInstalados.map((k) => {
+                const c = CULTIVOS[k]
+                if (!c) return null
+                const sel = cultivoSel === k
+                return (
+                  <Pressable
+                    key={k}
+                    onPress={() => setCultivoSel(k)}
+                    style={[s.chipFiltro, { borderColor: C.borde2, backgroundColor: C.fondo2 }, sel && { borderColor: c.color, backgroundColor: c.color + '22' }]}
+                  >
+                    <Text style={[s.chipFiltroTxt, { color: sel ? c.color : C.texto }]}>{c.nombre}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Filtros: Estado */}
+          <View style={s.grupoFiltro}>
+            <Text style={[s.filtroTitulo, { color: C.tenue }]}>Estado:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filaChips}>
+              {[
+                { id: 'todos', label: 'Todos' },
+                { id: 'enferma', label: 'Enferma', color: C.rosa },
+                { id: 'sana', label: 'Sana', color: C.sana },
+                { id: 'no_concluyente', label: 'No concluyente', color: C.oro },
+              ].map((opt) => {
+                const sel = estadoSel === opt.id
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setEstadoSel(opt.id as any)}
+                    style={[s.chipFiltro, { borderColor: C.borde2, backgroundColor: C.fondo2 }, sel && { borderColor: opt.color ?? C.acento, backgroundColor: (opt.color ?? C.acento) + '22' }]}
+                  >
+                    <Text style={[s.chipFiltroTxt, { color: sel ? (opt.color ?? C.acento) : C.texto }]}>{opt.label}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Filtros: Urgencia */}
+          <View style={s.grupoFiltro}>
+            <Text style={[s.filtroTitulo, { color: C.tenue }]}>Urgencia:</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filaChips}>
+              {[
+                { id: 'todas', label: 'Todas' },
+                { id: 'critica', label: 'Crítica', color: C.coral },
+                { id: 'alta', label: 'Alta', color: C.coral },
+                { id: 'media', label: 'Media', color: C.oro },
+                { id: 'ninguna', label: 'Ninguna / Sana', color: C.sana },
+              ].map((opt) => {
+                const sel = urgenciaSel === opt.id
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setUrgenciaSel(opt.id)}
+                    style={[s.chipFiltro, { borderColor: C.borde2, backgroundColor: C.fondo2 }, sel && { borderColor: opt.color ?? C.acento, backgroundColor: (opt.color ?? C.acento) + '22' }]}
+                  >
+                    <Text style={[s.chipFiltroTxt, { color: sel ? (opt.color ?? C.acento) : C.texto }]}>{opt.label}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Filtros: Rango de fecha y orden */}
+          <View style={s.grupoFiltro}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={[s.filtroTitulo, { color: C.tenue }]}>Fecha y orden:</Text>
+              <Pressable onPress={() => setOrdenReciente(!ordenReciente)} hitSlop={6} style={[s.chipOrden, { borderColor: C.borde2, backgroundColor: C.fondo2 }]}>
+                <Text style={{ color: C.acento, fontSize: 12, fontWeight: '700' }}>
+                  {ordenReciente ? '↓ Más recientes' : '↑ Más antiguos'}
+                </Text>
+              </Pressable>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.filaChips}>
+              {[
+                { id: 'todo', label: 'Todo' },
+                { id: 'hoy', label: 'Hoy' },
+                { id: '7dias', label: '7 días' },
+                { id: '30dias', label: '30 días' },
+              ].map((opt) => {
+                const sel = fechaSel === opt.id
+                return (
+                  <Pressable
+                    key={opt.id}
+                    onPress={() => setFechaSel(opt.id as any)}
+                    style={[s.chipFiltro, { borderColor: C.borde2, backgroundColor: C.fondo2 }, sel && { borderColor: C.acento, backgroundColor: C.acento + '22' }]}
+                  >
+                    <Text style={[s.chipFiltroTxt, { color: sel ? C.acento : C.texto }]}>{opt.label}</Text>
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
+
+          {/* Contador de resultados y Quitar filtros */}
+          <View style={s.contadorFila}>
+            <Text style={[s.contadorTxt, { color: C.tenue }]}>
+              {filas.length === 0
+                ? '0 diagnósticos'
+                : filasFiltradas.length === filas.length
+                ? `${filas.length} ${filas.length === 1 ? 'diagnóstico' : 'diagnósticos'}`
+                : `${filasFiltradas.length} de ${filas.length} diagnósticos`}
+            </Text>
+            {hayFiltros && (
+              <Pressable onPress={quitarFiltros} hitSlop={8}>
+                <Text style={{ color: C.acento, fontSize: 13, fontWeight: '700' }}>Quitar filtros</Text>
+              </Pressable>
+            )}
+          </View>
         </View>
       }
-      ListEmptyComponent={<Text style={[s.tenue, { color: C.tenue, textAlign: 'center', marginTop: 30 }]}>Aún no hay diagnósticos.</Text>}
+      ListEmptyComponent={
+        filas.length === 0 ? (
+          <Text style={[s.tenue, { color: C.tenue, textAlign: 'center', marginTop: 30 }]}>Aún no hay diagnósticos.</Text>
+        ) : (
+          <View style={[s.vacioCaja, { backgroundColor: C.sup, borderColor: C.borde }]}>
+            <Text style={{ fontSize: 32, textAlign: 'center' }}>🔍</Text>
+            <Text style={[s.texto, { color: C.texto, fontWeight: '700', textAlign: 'center' }]}>
+              No se encontraron diagnósticos
+            </Text>
+            <Text style={[s.tenue, { color: C.tenue, textAlign: 'center', fontSize: 13 }]}>
+              No hay registros con los filtros o búsqueda actuales.
+            </Text>
+            <Pressable onPress={quitarFiltros} style={[s.botonQuitarFiltros, { backgroundColor: C.acento }]}>
+              <Text style={[s.botonQuitarFiltrosTxt, { color: C.textoBotonAcento }]}>Quitar filtros</Text>
+            </Pressable>
+          </View>
+        )
+      }
       renderItem={({ item: f }) => {
         const sana = f.clase ? esSana(f.clase) : false
         const color = f.estado !== 'diagnostico' ? C.oro : sana ? C.sana : C.rosa
+        const nomParcela = f.parcela_id ? mapaParcelas[f.parcela_id] : null
         return (
-          <Pressable onLongPress={() => { borrar(f.id); cargar() }} style={[s.item, { backgroundColor: C.sup, borderColor: C.borde, borderLeftColor: color }]}>
+          <View style={[s.item, { backgroundColor: C.sup, borderColor: C.borde, borderLeftColor: color }]}>
             <Image source={{ uri: f.foto }} style={s.mini} />
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={[s.texto, { color: C.texto, fontWeight: '700' }]}>{f.clase ? infoClase(f.clase, f.etiqueta).nombre : f.estado === 'rechazada' ? 'Foto no válida' : 'No concluyente'}</Text>
-              <Text style={[s.tenue, { color: C.tenue }]}>{CULTIVOS[f.cultivo ?? '']?.nombre ?? '—'} · {f.confianza ? Math.round(f.confianza * 100) + ' %' : ''} · {new Date(f.fecha).toLocaleString('es-PE')}</Text>
+              <Text style={[s.tenue, { color: C.tenue }]}>
+                {CULTIVOS[f.cultivo ?? '']?.nombre ?? '—'}{f.provincia ? ` · ${f.provincia}` : ''} · {f.confianza ? Math.round(f.confianza * 100) + ' %' : ''} · {new Date(f.fecha).toLocaleString('es-PE')}
+              </Text>
+              {nomParcela && (
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                  <Text style={[s.chipParcela, { color: C.acento, borderColor: C.acento + '55', backgroundColor: C.fondo2 }]}>
+                    🌱 {nomParcela}
+                  </Text>
+                </View>
+              )}
             </View>
-            <Text style={{ color: f.sincronizado === 1 ? C.acento : f.sincronizado === 2 ? C.coral : C.tenue, fontSize: 16 }}>{f.sincronizado === 1 ? '☁' : f.sincronizado === 2 ? '⚠' : '⏳'}</Text>
-          </Pressable>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: f.sincronizado === 1 ? C.acento : f.sincronizado === 2 ? C.coral : C.tenue, fontSize: 16 }}>{f.sincronizado === 1 ? '☁' : f.sincronizado === 2 ? '⚠' : '⏳'}</Text>
+              <Pressable
+                onPress={() => abrirOpciones(f)}
+                hitSlop={10}
+                style={s.botonTresPuntos}
+                accessibilityLabel="Opciones del diagnóstico"
+              >
+                <Text style={{ color: C.texto, fontSize: 20, fontWeight: '800', lineHeight: 22 }}>⋮</Text>
+              </Pressable>
+            </View>
+          </View>
         )
       }}
-      ListFooterComponent={filas.length ? <Text style={[s.pie, { color: C.tenue, textAlign: 'center' }]}>Mantén presionado un diagnóstico para borrarlo.</Text> : undefined}
+      ListFooterComponent={filasFiltradas.length ? <Text style={[s.pie, { color: C.tenue, textAlign: 'center' }]}>Toca el botón ⋮ para gestionar el diagnóstico o asignarlo a una parcela.</Text> : undefined}
     />
   )
 }
@@ -351,4 +734,19 @@ const s = StyleSheet.create({
   pestanaTxt: { fontSize: 11, fontWeight: '600' },
   item: { flexDirection: 'row', alignItems: 'center', gap: 12, borderRadius: 14, padding: 12, borderLeftWidth: 3.5, borderWidth: 1 },
   mini: { width: 50, height: 50, borderRadius: 10 },
+  cajaBusqueda: { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, minHeight: 46 },
+  inputBusqueda: { flex: 1, fontSize: 14, paddingVertical: 8 },
+  grupoFiltro: { gap: 6 },
+  filtroTitulo: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  filaChips: { flexDirection: 'row', gap: 6, alignItems: 'center' },
+  chipFiltro: { borderWidth: 1, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 6 },
+  chipFiltroTxt: { fontSize: 12, fontWeight: '700' },
+  chipOrden: { borderWidth: 1, borderRadius: 99, paddingHorizontal: 10, paddingVertical: 4 },
+  contadorFila: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 4, paddingBottom: 2 },
+  contadorTxt: { fontSize: 13, fontWeight: '600' },
+  vacioCaja: { borderWidth: 1, borderRadius: 16, padding: 24, gap: 8, alignItems: 'center', marginTop: 12 },
+  botonQuitarFiltros: { borderRadius: 12, paddingHorizontal: 16, paddingVertical: 10, marginTop: 4 },
+  botonQuitarFiltrosTxt: { fontWeight: '700', fontSize: 14 },
+  chipParcela: { fontSize: 11, fontWeight: '700', borderWidth: 1, borderRadius: 99, paddingHorizontal: 8, paddingVertical: 2 },
+  botonTresPuntos: { width: 34, height: 34, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
 })

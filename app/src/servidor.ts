@@ -75,3 +75,63 @@ export async function subir(p: Pendiente): Promise<number> {
   if (p.provincia) f.append('provincia', p.provincia)
   return (await pedir('/api/sincronizar', f, 60000)).id
 }
+
+export async function borrarDiagnosticoRemoto(id: number): Promise<boolean> {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000)
+  try {
+    const res = await fetch(`${API}/api/historial/${id}`, {
+      method: 'DELETE',
+      headers: cabecera(),
+      signal: ctl.signal,
+    })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+export async function agregarDiagnosticoAParcelaRemota(
+  parcelaId: number,
+  diagnosticoId: number,
+  severidad?: number,
+  nota?: string
+): Promise<boolean> {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000)
+  try {
+    const cuerpo: Record<string, any> = { diagnostico_id: diagnosticoId }
+    if (severidad != null) cuerpo.severidad = severidad
+    if (nota) cuerpo.nota = nota
+    const res = await fetch(`${API}/api/parcelas/${parcelaId}/diagnosticos`, {
+      method: 'POST',
+      headers: { ...cabecera(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: ctl.signal,
+    })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(t)
+  }
+}
+
+export async function quitarDiagnosticoDeParcelaRemota(
+  parcelaId: number,
+  diagnosticoId: number
+): Promise<boolean> {
+  const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), 15000)
+  try {
+    const res = await fetch(`${API}/api/parcelas/${parcelaId}/diagnosticos/${diagnosticoId}`, {
+      method: 'DELETE',
+      headers: cabecera(),
+      signal: ctl.signal,
+    })
+    return res.ok
+  } catch {
+    return false
+  } finally {
+    clearTimeout(t)
+  }
+}

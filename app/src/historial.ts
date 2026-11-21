@@ -9,17 +9,43 @@ import { ErrorServidor, enLinea, enviar, subir } from './servidor'
 import { alCambiar, cuentaActual, olvidarSesion, provinciaActual } from './cuenta'
 
 // sincronizado: 0 pendiente | 1 subido | 2 el servidor no lo aceptó (ver error)
-export type Fila = Resultado & { id: number; fecha: string; foto: string; sincronizado: number; provincia: string | null; error: string | null }
-type FilaDb = { id: number; fecha: string; foto: string; datos: string; sincronizado: number; id_cliente: string; provincia: string | null; error: string | null }
+export type Fila = Resultado & {
+  id: number
+  fecha: string
+  foto: string
+  sincronizado: number
+  provincia: string | null
+  error: string | null
+  servidor_id?: number | null
+  parcela_id?: number | null
+}
+type FilaDb = {
+  id: number
+  fecha: string
+  foto: string
+  datos: string
+  sincronizado: number
+  id_cliente: string
+  provincia: string | null
+  error: string | null
+  servidor_id?: number | null
+  parcela_id?: number | null
+}
 
 const db = SQLite.openDatabaseSync('fitolens.db')
 db.execSync(`CREATE TABLE IF NOT EXISTS diagnosticos (
   id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TEXT NOT NULL, foto TEXT NOT NULL, datos TEXT NOT NULL, sincronizado INTEGER NOT NULL DEFAULT 0)`)
+
 // Columnas nuevas para teléfonos que ya tenían la app instalada (no se borra nada).
-const columnas = db.getAllSync<{ name: string }>('PRAGMA table_info(diagnosticos)').map((c) => c.name)
-for (const [c, tipo] of [['id_cliente', 'TEXT'], ['provincia', 'TEXT'], ['servidor_id', 'INTEGER'], ['error', 'TEXT']])
-  if (!columnas.includes(c)) db.execSync(`ALTER TABLE diagnosticos ADD COLUMN ${c} ${tipo}`)
-db.execSync(`UPDATE diagnosticos SET id_cliente = lower(hex(randomblob(16))) WHERE id_cliente IS NULL`)
+try {
+  const columnas = db.getAllSync<{ name: string }>('PRAGMA table_info(diagnosticos)').map((c) => c.name)
+  for (const [c, tipo] of [['id_cliente', 'TEXT'], ['provincia', 'TEXT'], ['servidor_id', 'INTEGER'], ['error', 'TEXT'], ['parcela_id', 'INTEGER']]) {
+    if (!columnas.includes(c)) db.execSync(`ALTER TABLE diagnosticos ADD COLUMN ${c} ${tipo}`)
+  }
+} catch {}
+try {
+  db.execSync(`UPDATE diagnosticos SET id_cliente = lower(hex(randomblob(16))) WHERE id_cliente IS NULL`)
+} catch {}
 
 export function guardar(uri: string, r: Resultado) {
   const destino = new File(Paths.document, `foto_${Date.now()}.jpg`)
@@ -36,12 +62,31 @@ export function listar(): Fila[] {
     .map(({ datos, id_cliente, ...f }) => ({ ...JSON.parse(datos), ...f }))
 }
 
+export function obtenerDiagnostico(id: number): Fila | null {
+  try {
+    const f = db.getFirstSync<FilaDb>('SELECT * FROM diagnosticos WHERE id = ?', id)
+    if (!f) return null
+    const { datos, id_cliente, ...resto } = f
+    return { ...JSON.parse(datos), ...resto }
+  } catch {
+    return null
+  }
+}
+
+export function asignarParcela(id: number, parcelaId: number | null) {
+  try {
+    db.runSync('UPDATE diagnosticos SET parcela_id = ? WHERE id = ?', parcelaId, id)
+  } catch {}
+}
+
 export const pendientes = () => db.getFirstSync<{ n: number }>('SELECT COUNT(*) AS n FROM diagnosticos WHERE sincronizado = 0')?.n ?? 0
 
 export function borrar(id: number) {
-  const f = db.getFirstSync<{ foto: string }>('SELECT foto FROM diagnosticos WHERE id = ?', id)
-  try { if (f) new File(f.foto).delete() } catch { /* ya no existe */ }
-  db.runSync('DELETE FROM diagnosticos WHERE id = ?', id)
+  try {
+    const f = db.getFirstSync<{ foto: string }>('SELECT foto FROM diagnosticos WHERE id = ?', id)
+    try { if (f) new File(f.foto).delete() } catch { /* ya no existe */ }
+    db.runSync('DELETE FROM diagnosticos WHERE id = ?', id)
+  } catch {}
 }
 
 // Sube la cola. Con cuenta: /api/sincronizar (queda en el historial de la web, con la fecha real y sin duplicar).

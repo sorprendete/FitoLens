@@ -1,6 +1,6 @@
-import { ArrowLeft, Camera, MapPin, Plus, Sprout, Trash2, TrendingDown, TrendingUp } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { diagnosticar, parcelas as api } from '../api/cliente'
+import { ArrowLeft, Camera, MapPin, Plus, Search, Sprout, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { diagnosticar, obtenerHistorial, parcelas as api } from '../api/cliente'
 import { Leyenda } from '../componentes/Graficos'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
 import { PROVINCIAS } from '../datos/provincias'
@@ -22,15 +22,86 @@ function Lista({ onAbrir }) {
   const [items, setItems] = useState(null)
   const [error, setError] = useState('')
   const [nueva, setNueva] = useState(false)
-  const cargar = useCallback(() => api.listar().then((r) => setItems(r.items)).catch((e) => { setError(e.message); setItems([]) }), [])
+  const [q, setQ] = useState('')
+  const [cultivo, setCultivo] = useState('')
+
+  const cargar = useCallback(() => {
+    try {
+      api.listar().then((r) => setItems(r.items)).catch((e) => { setError(e.message); setItems([]) })
+    } catch (e) {
+      setError(e.message)
+      setItems([])
+    }
+  }, [])
   useEffect(() => { cargar() }, [cargar])
+
+  const filas = useMemo(() => {
+    if (!items) return []
+    const qNorm = q.trim().toLowerCase()
+    return items.filter((p) => {
+      if (cultivo && p.cultivo !== cultivo) return false
+      if (qNorm) {
+        const nom = (p.nombre ?? '').toLowerCase()
+        const prov = (nombreProv[p.provincia] ?? p.provincia ?? '').toLowerCase()
+        const cult = (CULTIVOS[p.cultivo]?.nombre ?? p.cultivo ?? '').toLowerCase()
+        if (!nom.includes(qNorm) && !prov.includes(qNorm) && !cult.includes(qNorm)) return false
+      }
+      return true
+    })
+  }, [items, q, cultivo])
+
+  const hayFiltros = Boolean(q.trim() || cultivo)
+  const limpiarFiltros = () => {
+    setQ('')
+    setCultivo('')
+  }
 
   return (
     <div className="apilado">
       <div className="barra-filtros">
-        <p className="tenue" style={{ flex: 1, margin: 0 }}>Registra tus parcelas y anota cada visita para ver si mejoran con el tratamiento.</p>
-        <button className="btn" onClick={() => setNueva((v) => !v)}><Plus size={18} />Nueva parcela</button>
+        <div className="entrada buscador" style={{ minWidth: 200 }}>
+          <Search size={18} />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Buscar parcela por nombre o lugar…"
+            aria-label="Buscar parcela"
+          />
+          {q && (
+            <button type="button" className="ojo" onClick={() => setQ('')} aria-label="Limpiar">
+              <X size={15} />
+            </button>
+          )}
+        </div>
+
+        <select value={cultivo} onChange={(e) => setCultivo(e.target.value)} aria-label="Cultivo">
+          <option value="">Todos los cultivos</option>
+          {Object.entries(CULTIVOS).map(([id, c]) => <option key={id} value={id}>{c.nombre}</option>)}
+        </select>
+
+        {hayFiltros && (
+          <button className="btn sec" onClick={limpiarFiltros} title="Quitar filtros">
+            <X size={16} />Quitar filtros
+          </button>
+        )}
+
+        <button className="btn" onClick={() => setNueva((v) => !v)} style={{ marginLeft: 'auto' }}>
+          <Plus size={18} />Nueva parcela
+        </button>
       </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <span className="tenue" style={{ fontSize: '.85rem' }}>
+          {items === null
+            ? 'Cargando parcelas…'
+            : items.length === 0
+            ? '0 parcelas'
+            : filas.length === items.length
+            ? `${items.length} ${items.length === 1 ? 'parcela' : 'parcelas'}`
+            : `Mostrando ${filas.length} de ${items.length} parcelas`}
+        </span>
+      </div>
+
       {error && <p className="alerta mal">{error}</p>}
       {nueva && <FormParcela onListo={(p) => { setNueva(false); onAbrir(p.id) }} />}
       {items && !items.length && !nueva && (
@@ -41,9 +112,15 @@ function Lista({ onAbrir }) {
           <button className="btn" onClick={() => setNueva(true)}>Registrar mi parcela</button>
         </div>
       )}
+      {items && items.length > 0 && !filas.length && !nueva && (
+        <div className="tarjeta vacio">
+          <p className="tenue">No se encontraron parcelas con los filtros actuales.</p>
+          <button className="btn sec" onClick={limpiarFiltros}><X size={16} />Quitar filtros</button>
+        </div>
+      )}
       <div className="rejilla-3">
         {items === null && Array.from({ length: 3 }, (_, i) => <div key={i} className="tarjeta esqueleto parcela-tarjeta" />)}
-        {items?.map((p) => (
+        {filas.map((p) => (
           <button key={p.id} className="tarjeta parcela-tarjeta" onClick={() => onAbrir(p.id)}>
             <span className="punto-txt" style={{ '--c': CULTIVOS[p.cultivo]?.color }}>{CULTIVOS[p.cultivo]?.nombre}</span>
             <h3>{p.nombre}</h3>
@@ -103,8 +180,16 @@ function FormParcela({ onListo }) {
 function Detalle({ id, onVolver }) {
   const [p, setP] = useState(null)
   const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
+  const [mostrarAgregar, setMostrarAgregar] = useState(false)
   const cargar = useCallback(() => api.detalle(id).then(setP).catch((e) => setError(e.message)), [id])
   useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    if (!aviso) return
+    const t = setTimeout(() => setAviso(''), 4000)
+    return () => clearTimeout(t)
+  }, [aviso])
 
   async function borrarParcela() {
     if (!window.confirm(`¿Borrar la parcela "${p.nombre}"? Los diagnósticos se conservan en tu historial.`)) return
@@ -113,6 +198,15 @@ function Detalle({ id, onVolver }) {
   async function borrarVisita(v) {
     try { await api.borrarVisita(id, v.id); cargar() } catch (e) { setError(e.message) }
   }
+  async function quitarDiag(diagId) {
+    try {
+      await api.quitarDiagnostico(id, diagId)
+      setAviso('Diagnóstico quitado de la parcela.')
+      cargar()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
 
   if (!p) return error ? <p className="alerta mal">{error}</p> : <div className="tarjeta esqueleto parcela-tarjeta" />
   const t = TENDENCIA[p.tendencia]
@@ -120,10 +214,25 @@ function Detalle({ id, onVolver }) {
     <div className="apilado">
       <div className="barra-filtros">
         <button className="btn sec chico" onClick={onVolver}><ArrowLeft size={16} />Mis parcelas</button>
+        <button className="btn chico" onClick={() => setMostrarAgregar((v) => !v)}><Plus size={16} />Agregar diagnósticos</button>
         <span style={{ flex: 1 }} />
         <button className="btn peligro chico" onClick={borrarParcela}><Trash2 size={16} />Borrar parcela</button>
       </div>
+      {aviso && <p className="alerta ok">{aviso}</p>}
       {error && <p className="alerta mal">{error}</p>}
+
+      {mostrarAgregar && (
+        <ModalAgregarDiagnosticos
+          parcela={p}
+          onCerrar={() => setMostrarAgregar(false)}
+          onListo={() => {
+            setMostrarAgregar(false)
+            setAviso('Diagnósticos agregados a la parcela.')
+            cargar()
+          }}
+        />
+      )}
+
       <section className="tarjeta destacada">
         <div style={{ flex: 1 }}>
           <span className="punto-txt" style={{ '--c': CULTIVOS[p.cultivo]?.color }}>{CULTIVOS[p.cultivo]?.nombre}</span>
@@ -145,7 +254,7 @@ function Detalle({ id, onVolver }) {
       <div className="rejilla-2 ancha-izq">
         <section className="tarjeta sin-relleno">
           <table className="tabla">
-            <thead><tr><th>Fecha</th><th>Severidad</th><th>Diagnóstico IA</th><th>Tratamiento / nota</th><th /></tr></thead>
+            <thead><tr><th>Fecha</th><th>Severidad</th><th>Diagnóstico IA</th><th>Tratamiento / nota</th><th>Acciones</th></tr></thead>
             <tbody>
               {[...p.historial].reverse().map((v) => (
                 <tr key={v.id}>
@@ -153,7 +262,21 @@ function Detalle({ id, onVolver }) {
                   <td data-l="Severidad"><Severidad v={v.severidad} /></td>
                   <td data-l="Diagnóstico IA">{v.clase ? `${infoClase(v.clase).nombre} (${pct(v.confianza)})` : v.estado === 'no_concluyente' ? 'No concluyente' : '—'}</td>
                   <td data-l="Tratamiento / nota">{v.tratamiento && <b className="bloque-txt">{v.tratamiento}</b>}{v.nota && <span className="tenue">{v.nota}</span>}{!v.tratamiento && !v.nota && '—'}</td>
-                  <td><button className="icono-btn" onClick={() => borrarVisita(v)} aria-label="Borrar visita" title="Borrar visita"><Trash2 size={16} /></button></td>
+                  <td data-l="Acciones">
+                    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                      {v.diagnostico_id && (
+                        <button
+                          type="button"
+                          className="btn sec chico"
+                          onClick={() => quitarDiag(v.diagnostico_id)}
+                          title="Quitar de la parcela"
+                        >
+                          Quitar
+                        </button>
+                      )}
+                      <button className="icono-btn" onClick={() => borrarVisita(v)} aria-label="Borrar visita" title="Borrar visita"><Trash2 size={16} /></button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -162,6 +285,137 @@ function Detalle({ id, onVolver }) {
         </section>
         <FormVisita parcela={p} onListo={cargar} />
       </div>
+    </div>
+  )
+}
+
+function ModalAgregarDiagnosticos({ parcela, onCerrar, onListo }) {
+  const [diags, setDiags] = useState([])
+  const [cargando, setCargando] = useState(true)
+  const [q, setQ] = useState('')
+  const [seleccionados, setSeleccionados] = useState(new Set())
+  const [error, setError] = useState('')
+  const [guardando, setGuardando] = useState(false)
+
+  useEffect(() => {
+    obtenerHistorial(200, { sin_parcela: true })
+      .then((r) => {
+        setDiags(r.items ?? [])
+        setCargando(false)
+      })
+      .catch((e) => {
+        setError(e.message)
+        setCargando(false)
+      })
+  }, [])
+
+  const filtrados = useMemo(() => {
+    const qNorm = q.trim().toLowerCase()
+    return diags.filter((d) => {
+      if (qNorm) {
+        const enf = d.clase ? infoClase(d.clase, d.etiqueta).nombre.toLowerCase() : 'no concluyente'
+        const cult = (CULTIVOS[d.cultivo]?.nombre ?? d.cultivo ?? '').toLowerCase()
+        const prov = (nombreProv[d.provincia] ?? d.provincia ?? '').toLowerCase()
+        if (!enf.includes(qNorm) && !cult.includes(qNorm) && !prov.includes(qNorm)) return false
+      }
+      return true
+    })
+  }, [diags, q])
+
+  const alternar = (id) => {
+    setSeleccionados((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const alternarTodos = () => {
+    if (seleccionados.size === filtrados.length) {
+      setSeleccionados(new Set())
+    } else {
+      setSeleccionados(new Set(filtrados.map((d) => d.id)))
+    }
+  }
+
+  async function guardar() {
+    if (!seleccionados.size) return
+    setGuardando(true)
+    setError('')
+    try {
+      for (const diagId of seleccionados) {
+        await api.agregarDiagnostico(parcela.id, { diagnostico_id: diagId })
+      }
+      onListo()
+    } catch (e) {
+      setError(e.message)
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <div className="tarjeta" style={{ border: '2px solid var(--acento)', animation: 'subir .25s ease' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+        <h3 style={{ margin: 0 }}>Agregar diagnósticos a {parcela.nombre}</h3>
+        <button type="button" className="ojo" onClick={onCerrar} aria-label="Cerrar"><X size={18} /></button>
+      </div>
+      <p className="tenue pequeno" style={{ margin: '0 0 12px' }}>
+        Diagnósticos sin parcela asignada disponibles para agregar a esta parcela.
+      </p>
+
+      <div className="entrada buscador" style={{ marginBottom: 12 }}>
+        <Search size={16} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Buscar por enfermedad, cultivo o provincia…"
+          aria-label="Buscar diagnósticos"
+        />
+        {q && <button type="button" className="ojo" onClick={() => setQ('')}><X size={14} /></button>}
+      </div>
+
+      {error && <p className="alerta mal">{error}</p>}
+
+      {cargando ? (
+        <p className="tenue">Cargando diagnósticos sin parcela…</p>
+      ) : diags.length === 0 ? (
+        <p className="tenue">No hay diagnósticos sin parcela disponibles.</p>
+      ) : (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+            <button type="button" className="btn sec chico" onClick={alternarTodos}>
+              {seleccionados.size === filtrados.length ? 'Deseleccionar todos' : 'Seleccionar todos'}
+            </button>
+            <span className="tenue pequeno">{seleccionados.size} de {filtrados.length} seleccionados</span>
+          </div>
+
+          <div style={{ maxHeight: 240, overflowY: 'auto', border: '1px solid var(--borde)', borderRadius: 10, padding: 6, display: 'grid', gap: 6 }}>
+            {filtrados.map((d) => {
+              const sel = seleccionados.has(d.id)
+              return (
+                <label key={d.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 8, borderRadius: 8, background: sel ? 'color-mix(in srgb, var(--acento) 12%, transparent)' : 'var(--fondo-2)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={sel} onChange={() => alternar(d.id)} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600 }}>{d.clase ? infoClase(d.clase, d.etiqueta).nombre : 'No concluyente'}</div>
+                    <small className="tenue">
+                      {CULTIVOS[d.cultivo]?.nombre ?? d.cultivo ?? '—'} · {fecha(d.creado)} · {nombreProv[d.provincia] ?? d.provincia ?? '—'}
+                    </small>
+                  </div>
+                </label>
+              )
+            })}
+            {filtrados.length === 0 && <p className="tenue centro relleno">No hay diagnósticos que coincidan con la búsqueda.</p>}
+          </div>
+
+          <div className="acciones" style={{ marginTop: 14 }}>
+            <button type="button" className="btn" disabled={!seleccionados.size || guardando} onClick={guardar}>
+              {guardando ? 'Guardando…' : `Agregar ${seleccionados.size} diagnóstico${seleccionados.size === 1 ? '' : 's'}`}
+            </button>
+            <button type="button" className="btn sec" onClick={onCerrar}>Cancelar</button>
+          </div>
+        </>
+      )}
     </div>
   )
 }

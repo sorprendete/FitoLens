@@ -2,10 +2,11 @@
 // Misma idea que la web: cada visita guarda severidad (0 a 3), tratamiento y, si hubo foto, el diagnóstico.
 import * as SQLite from 'expo-sqlite'
 import type { Resultado } from './ia'
+import { esSana } from './catalogo'
 
-export type Parcela = { id: number; nombre: string; cultivo: string; lugar: string | null; creado: string }
+export type Parcela = { id: number; nombre: string; cultivo: string; lugar: string | null; creado: string; servidor_id?: number | null }
 export type Visita = { id: number; parcela_id: number; fecha: string; severidad: number; tratamiento: string | null
-  nota: string | null; clase: string | null; confianza: number | null; foto: string | null }
+  nota: string | null; clase: string | null; confianza: number | null; foto: string | null; diagnostico_id?: number | null }
 export type Tendencia = 'mejora' | 'empeora' | 'igual' | 'sin_datos'
 
 // Verde solo para "sin síntomas"; de naranja a rojo oscuro, cuanto más daño (igual que la web).
@@ -23,6 +24,20 @@ db.execSync(`
   CREATE TABLE IF NOT EXISTS visitas (id INTEGER PRIMARY KEY AUTOINCREMENT, parcela_id INTEGER NOT NULL, fecha TEXT NOT NULL, severidad INTEGER NOT NULL,
     tratamiento TEXT, nota TEXT, clase TEXT, confianza REAL, foto TEXT);`)
 
+try {
+  const colVisitas = db.getAllSync<{ name: string }>('PRAGMA table_info(visitas)').map((c) => c.name)
+  if (!colVisitas.includes('diagnostico_id')) {
+    db.execSync('ALTER TABLE visitas ADD COLUMN diagnostico_id INTEGER')
+  }
+} catch {}
+
+try {
+  const colParcelas = db.getAllSync<{ name: string }>('PRAGMA table_info(parcelas)').map((c) => c.name)
+  if (!colParcelas.includes('servidor_id')) {
+    db.execSync('ALTER TABLE parcelas ADD COLUMN servidor_id INTEGER')
+  }
+} catch {}
+
 export const listarParcelas = () => db.getAllSync<Parcela>('SELECT * FROM parcelas ORDER BY id DESC')
 
 export function crearParcela(nombre: string, cultivo: string, lugar: string) {
@@ -30,16 +45,62 @@ export function crearParcela(nombre: string, cultivo: string, lugar: string) {
 }
 
 export function borrarParcela(id: number) {
-  db.runSync('DELETE FROM visitas WHERE parcela_id = ?', id)
-  db.runSync('DELETE FROM parcelas WHERE id = ?', id)
+  try {
+    db.runSync('UPDATE diagnosticos SET parcela_id = NULL WHERE parcela_id = ?', id)
+  } catch {}
+  try {
+    db.runSync('DELETE FROM visitas WHERE parcela_id = ?', id)
+    db.runSync('DELETE FROM parcelas WHERE id = ?', id)
+  } catch {}
 }
 
 export const visitas = (parcela: number) =>
   db.getAllSync<Visita>('SELECT * FROM visitas WHERE parcela_id = ? ORDER BY fecha, id', parcela)
 
-export function agregarVisita(parcela: number, severidad: number, tratamiento: string, nota: string, r?: Resultado | null, foto?: string | null) {
-  db.runSync('INSERT INTO visitas (parcela_id, fecha, severidad, tratamiento, nota, clase, confianza, foto) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    parcela, new Date().toISOString(), severidad, tratamiento.trim() || null, nota.trim() || null, r?.clase ?? null, r?.confianza ?? null, foto ?? null)
+export function agregarVisita(parcela: number, severidad: number, tratamiento: string, nota: string, r?: Resultado | null, foto?: string | null, diagnostico_id?: number | null) {
+  db.runSync('INSERT INTO visitas (parcela_id, fecha, severidad, tratamiento, nota, clase, confianza, foto, diagnostico_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    parcela, new Date().toISOString(), severidad, tratamiento.trim() || null, nota.trim() || null, r?.clase ?? null, r?.confianza ?? null, foto ?? null, diagnostico_id ?? null)
+}
+
+export function agregarDiagnosticoAParcela(
+  parcelaId: number,
+  diagnosticoId: number,
+  r?: Resultado | null,
+  foto?: string | null,
+  severidad?: number,
+  nota?: string
+) {
+  try {
+    const existe = db.getFirstSync<{ id: number }>(
+      'SELECT id FROM visitas WHERE parcela_id = ? AND diagnostico_id = ?',
+      parcelaId,
+      diagnosticoId
+    )
+    if (existe) return
+    const sev = severidad ?? (r?.clase && esSana(r.clase) ? 0 : 2)
+    db.runSync(
+      'INSERT INTO visitas (parcela_id, fecha, severidad, tratamiento, nota, clase, confianza, foto, diagnostico_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      parcelaId,
+      new Date().toISOString(),
+      sev,
+      null,
+      nota?.trim() || null,
+      r?.clase ?? null,
+      r?.confianza ?? null,
+      foto ?? null,
+      diagnosticoId
+    )
+  } catch {}
+}
+
+export function quitarDiagnosticoDeParcela(parcelaId: number, diagnosticoId: number) {
+  try {
+    db.runSync(
+      'DELETE FROM visitas WHERE parcela_id = ? AND diagnostico_id = ?',
+      parcelaId,
+      diagnosticoId
+    )
+  } catch {}
 }
 
 export const borrarVisita = (id: number) => db.runSync('DELETE FROM visitas WHERE id = ?', id)

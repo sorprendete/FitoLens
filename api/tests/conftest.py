@@ -21,6 +21,9 @@ def dir_modelos(tmp_path_factory):
 
 @pytest.fixture
 def cliente(tmp_path, dir_modelos, monkeypatch):
+    # Cada prueba empieza con el limitador vacío (es global y si no se acumula entre pruebas).
+    from app.seguridad.limites import limitador
+    limitador._eventos.clear()
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path / 'test.db'}")
     monkeypatch.setenv("JWT_SECRETO", "secreto-de-pruebas-0123456789abcdef")
     monkeypatch.setenv("MODELOS_DIR", str(dir_modelos))

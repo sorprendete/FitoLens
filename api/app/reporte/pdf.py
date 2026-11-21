@@ -63,6 +63,11 @@ def _obtener_url_sitio() -> str:
 URL_SITIO = _obtener_url_sitio()
 
 
+def _texto(t: str | None) -> str:
+    """Alias histórico de _limpiar (lo usan las pruebas de cultivos)."""
+    return _limpiar(t)
+
+
 def _limpiar(t: str | None) -> str:
     """Convierte caracteres Unicode a su equivalente Latin-1 para fuentes estándar de FPDF."""
     if not t:

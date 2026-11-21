@@ -28,22 +28,40 @@ if (esAndroid) {
 
 /** Arranca la descarga del APK en segundo plano. */
 export function iniciar(url: string, version: string, sha256?: string | null): void {
-  modulo?.iniciar(url, version, sha256 ?? '')
+  try { modulo?.iniciar(url, version, sha256 ?? '') } catch {}
 }
 
 /** Pausa la descarga sin borrar lo descargado. */
-export function pausar(): void { modulo?.pausar() }
+export function pausar(): void {
+  try { modulo?.pausar() } catch {}
+}
 
 /** Reanuda la descarga desde donde se quedó. */
-export function reanudar(): void { modulo?.reanudar() }
+export function reanudar(): void {
+  try { modulo?.reanudar() } catch {}
+}
 
 /** Cancela la descarga y borra el archivo parcial. */
-export function cancelar(): void { modulo?.cancelar() }
+export function cancelar(): void {
+  try { modulo?.cancelar() } catch {}
+}
 
 /** Consulta el estado actual de forma síncrona (lee SharedPreferences). */
 export function estado(): EstadoDescarga {
   if (!modulo) return VACIO
-  try { return modulo.estado() as EstadoDescarga } catch { return VACIO }
+  try {
+    const res = modulo.estado()
+    if (!res || typeof res !== 'object') return VACIO
+    return {
+      estado: res.estado || 'inactiva',
+      bytes: Number(res.bytes) || 0,
+      total: Number(res.total) || 0,
+      version: String(res.version || ''),
+      error: res.error ? String(res.error) : undefined,
+    }
+  } catch {
+    return VACIO
+  }
 }
 
 /** Abre el instalador del APK ya descargado. Devuelve 'ok', 'permiso_requerido', 'archivo_no_encontrado', 'no_lista' o 'error'. */
@@ -73,6 +91,23 @@ export const disponible = !!modulo
  */
 export function escuchar(cb: (e: EstadoDescarga) => void): () => void {
   if (!modulo?.addListener) return () => {}
-  const sub = modulo.addListener('onCambio', cb)
-  return () => sub.remove()
+  try {
+    const sub = modulo.addListener('onCambio', (e: any) => {
+      try {
+        if (!e || typeof e !== 'object') return
+        cb({
+          estado: e.estado || 'inactiva',
+          bytes: Number(e.bytes) || 0,
+          total: Number(e.total) || 0,
+          version: String(e.version || ''),
+          error: e.error ? String(e.error) : undefined,
+        })
+      } catch {}
+    })
+    return () => {
+      try { sub?.remove?.() } catch {}
+    }
+  } catch {
+    return () => {}
+  }
 }

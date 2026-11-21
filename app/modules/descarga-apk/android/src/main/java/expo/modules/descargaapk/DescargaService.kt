@@ -22,7 +22,6 @@ import androidx.core.app.ServiceCompat
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileOutputStream
-import java.io.RandomAccessFile
 import java.net.HttpURLConnection
 import java.net.URL
 import java.security.MessageDigest
@@ -85,34 +84,57 @@ class DescargaService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        crearCanal()
-        connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        try {
+            crearCanal()
+            connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en onCreate", e)
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        when (intent?.action) {
-            CMD_INICIAR -> {
-                url = intent.getStringExtra("url") ?: ""
-                version = intent.getStringExtra("version") ?: ""
-                sha256Esperado = intent.getStringExtra("sha256") ?: ""
-                if (url.isBlank()) { stopSelf(); return START_NOT_STICKY }
+        if (intent == null || intent.action.isNullOrBlank()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        try {
+            when (intent.action) {
+                CMD_INICIAR -> {
+                    url = intent.getStringExtra("url") ?: ""
+                    version = intent.getStringExtra("version") ?: ""
+                    sha256Esperado = intent.getStringExtra("sha256") ?: ""
+                    if (url.isBlank()) {
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
 
-                EstadoStore.guardarConfig(this, url, version, sha256Esperado)
-                cancelado = false
-                pausado = false
-                iniciarPrimerPlano()
-                iniciarDescarga()
-            }
-            CMD_PAUSAR -> pausar()
-            CMD_REANUDAR -> {
-                // Leer config guardada por si el servicio fue recreado
-                if (url.isBlank()) {
-                    val (u, v, s) = EstadoStore.leerConfig(this)
-                    url = u; version = v; sha256Esperado = s
+                    EstadoStore.guardarConfig(this, url, version, sha256Esperado)
+                    cancelado = false
+                    pausado = false
+                    iniciarPrimerPlano()
+                    iniciarDescarga()
                 }
-                reanudar()
+                CMD_PAUSAR -> pausar()
+                CMD_REANUDAR -> {
+                    // Leer config guardada por si el servicio fue recreado
+                    if (url.isBlank()) {
+                        val (u, v, s) = EstadoStore.leerConfig(this)
+                        url = u; version = v; sha256Esperado = s
+                    }
+                    if (url.isBlank()) {
+                        stopSelf()
+                        return START_NOT_STICKY
+                    }
+                    reanudar()
+                }
+                CMD_CANCELAR -> cancelar()
+                else -> {
+                    stopSelf()
+                }
             }
-            CMD_CANCELAR -> cancelar()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en onStartCommand", e)
+            stopSelf()
         }
         return START_NOT_STICKY
     }
@@ -120,14 +142,20 @@ class DescargaService : Service() {
     // ── Primer plano ──────────────────────────────────────────────────────
 
     private fun iniciarPrimerPlano() {
-        val notif = construirNotifProgreso(0, 0, "Preparando…")
-        if (Build.VERSION.SDK_INT >= 34) {
-            ServiceCompat.startForeground(
-                this, NOTIF_ID, notif,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-            )
-        } else {
-            startForeground(NOTIF_ID, notif)
+        try {
+            val notif = construirNotifProgreso(0, 0, "Preparando…")
+            if (Build.VERSION.SDK_INT >= 34) {
+                ServiceCompat.startForeground(
+                    this, NOTIF_ID, notif,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                )
+            } else {
+                startForeground(NOTIF_ID, notif)
+            }
+        } catch (e: Throwable) {
+            Log.e(TAG, "Error al iniciar servicio en primer plano", e)
+            actualizarEstado("error", "No se pudo iniciar el servicio de descarga")
+            stopSelf()
         }
     }
 
@@ -150,27 +178,51 @@ class DescargaService : Service() {
             } finally {
                 descargando = false
             }
-        }.apply { start() }
+        }.apply {
+            try {
+                start()
+            } catch (e: Exception) {
+                Log.e(TAG, "Error iniciando hilo de descarga", e)
+                descargando = false
+                actualizarEstado("error", "No se pudo iniciar la descarga")
+                stopSelf()
+            }
+        }
     }
 
     private fun descargar() {
-        val dir = getExternalFilesDir("actualizaciones")
-            ?: throw RuntimeException("No se pudo acceder al almacenamiento")
-        if (!dir.exists()) dir.mkdirs()
+        val dir = try {
+            getExternalFilesDir("actualizaciones")
+        } catch (e: Exception) {
+            null
+        }
+        if (dir == null) {
+            actualizarEstado("error", "No se pudo acceder al almacenamiento")
+            stopSelf()
+            return
+        }
+        try {
+            if (!dir.exists()) dir.mkdirs()
+        } catch (_: Exception) {}
 
         // Limpiar APKs de versiones viejas
-        dir.listFiles()?.forEach { f ->
-            if (f.name.startsWith("FitoLens-") && f.name.endsWith(".apk") && f.name != "FitoLens-$version.apk") {
-                f.delete()
+        try {
+            dir.listFiles()?.forEach { f ->
+                try {
+                    if (f.name.startsWith("FitoLens-") && f.name.endsWith(".apk") && f.name != "FitoLens-$version.apk") {
+                        f.delete()
+                    }
+                } catch (_: Exception) {}
             }
-        }
+        } catch (_: Exception) {}
 
         val archivo = File(dir, "FitoLens-$version.apk")
-        bytesDescargados = if (archivo.exists()) archivo.length() else 0L
+        bytesDescargados = try { if (archivo.exists()) archivo.length() else 0L } catch (_: Exception) { 0L }
 
         // Si ya existe y coincide sha256, no volver a descargarlo
         if (archivo.exists() && bytesDescargados > 0 && sha256Esperado.isNotBlank()) {
-            if (calcularSha256(archivo).equals(sha256Esperado, ignoreCase = true)) {
+            val hash = calcularSha256(archivo)
+            if (hash.isNotBlank() && hash.equals(sha256Esperado, ignoreCase = true)) {
                 desregistrarCallbackRed()
                 liberarLocks()
                 actualizarEstado("lista")
@@ -179,19 +231,20 @@ class DescargaService : Service() {
             }
         }
 
-        var conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            connectTimeout = 30_000
-            readTimeout = 30_000
-            if (bytesDescargados > 0) setRequestProperty("Range", "bytes=$bytesDescargados-")
-        }
-
+        var conn: HttpURLConnection? = null
         try {
+            conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                connectTimeout = 30_000
+                readTimeout = 30_000
+                if (bytesDescargados > 0) setRequestProperty("Range", "bytes=$bytesDescargados-")
+            }
+
             var codigo = conn.responseCode
 
             // Si el servidor responde 416 (Range Not Satisfiable), reiniciar descarga limpia
             if (codigo == 416) {
-                conn.disconnect()
-                archivo.delete()
+                try { conn.disconnect() } catch (_: Exception) {}
+                try { archivo.delete() } catch (_: Exception) {}
                 bytesDescargados = 0L
                 conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     connectTimeout = 30_000
@@ -203,7 +256,7 @@ class DescargaService : Service() {
             // Si el servidor no soporta Range, empezar de cero
             if (bytesDescargados > 0 && codigo == 200) {
                 bytesDescargados = 0
-                archivo.delete()
+                try { archivo.delete() } catch (_: Exception) {}
             }
 
             if (codigo != 200 && codigo != 206) {
@@ -212,7 +265,6 @@ class DescargaService : Service() {
 
             val contentLength = conn.getHeaderField("Content-Length")?.toLongOrNull() ?: -1L
             totalBytes = if (codigo == 206) {
-                // Content-Range: bytes inicio-fin/total
                 val rango = conn.getHeaderField("Content-Range")
                 rango?.substringAfter("/")?.toLongOrNull() ?: (bytesDescargados + contentLength)
             } else {
@@ -253,7 +305,7 @@ class DescargaService : Service() {
             verificarYFinalizar(archivo)
 
         } finally {
-            conn.disconnect()
+            try { conn?.disconnect() } catch (_: Exception) {}
             if (!pausado) liberarLocks()
         }
     }
@@ -262,7 +314,7 @@ class DescargaService : Service() {
         // Verificar tamaño
         if (totalBytes > 0 && archivo.length() != totalBytes) {
             actualizarEstado("error", error = "Tamaño incorrecto: ${archivo.length()} ≠ $totalBytes")
-            archivo.delete()
+            try { archivo.delete() } catch (_: Exception) {}
             mostrarNotifError("Error en la descarga")
             desregistrarCallbackRed()
             stopSelf()
@@ -272,9 +324,9 @@ class DescargaService : Service() {
         // Verificar sha256 si se proporcionó
         if (sha256Esperado.isNotBlank()) {
             val hash = calcularSha256(archivo)
-            if (!hash.equals(sha256Esperado, ignoreCase = true)) {
+            if (hash.isNotBlank() && !hash.equals(sha256Esperado, ignoreCase = true)) {
                 actualizarEstado("error", error = "SHA-256 no coincide")
-                archivo.delete()
+                try { archivo.delete() } catch (_: Exception) {}
                 mostrarNotifError("Archivo corrupto")
                 desregistrarCallbackRed()
                 stopSelf()
@@ -290,31 +342,35 @@ class DescargaService : Service() {
     }
 
     private fun calcularSha256(archivo: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        archivo.inputStream().use { inp ->
-            val buf = ByteArray(BUFFER)
-            var n: Int
-            while (inp.read(buf).also { n = it } != -1) digest.update(buf, 0, n)
+        return try {
+            val digest = MessageDigest.getInstance("SHA-256")
+            archivo.inputStream().use { inp ->
+                val buf = ByteArray(BUFFER)
+                var n: Int
+                while (inp.read(buf).also { n = it } != -1) digest.update(buf, 0, n)
+            }
+            digest.digest().joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error calculando SHA-256", e)
+            ""
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
     }
 
     // ── Pausar / Reanudar / Cancelar ──────────────────────────────────────
 
     private fun pausar() {
         pausado = true
-        hiloDescarga?.interrupt()
+        try { hiloDescarga?.interrupt() } catch (_: Exception) {}
         hiloDescarga = null
         liberarLocks()
         actualizarEstado("pausada")
         mostrarNotifPausa("En pausa · ${porcentaje()}%")
-        // Sale de primer plano pero la notificación queda
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        try {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        } catch (_: Exception) {}
     }
 
     private fun reanudar() {
-        // Siempre volver a primer plano primero: si el servicio se arrancó con startForegroundService,
-        // Android exige startForeground() en pocos segundos aunque la descarga ya esté en curso.
         iniciarPrimerPlano()
         if (descargando) return
         pausado = false
@@ -325,20 +381,24 @@ class DescargaService : Service() {
     private fun cancelar() {
         cancelado = true
         pausado = false
-        hiloDescarga?.interrupt()
+        try { hiloDescarga?.interrupt() } catch (_: Exception) {}
         hiloDescarga = null
         liberarLocks()
         desregistrarCallbackRed()
 
         // Borrar archivo parcial
-        val dir = getExternalFilesDir("actualizaciones")
-        if (dir != null) File(dir, "FitoLens-$version.apk").delete()
+        try {
+            val dir = getExternalFilesDir("actualizaciones")
+            if (dir != null) File(dir, "FitoLens-$version.apk").delete()
+        } catch (_: Exception) {}
 
         EstadoStore.limpiar(this)
         actualizarEstado("inactiva")
 
-        val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.cancel(NOTIF_ID)
+        try {
+            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+            nm?.cancel(NOTIF_ID)
+        } catch (_: Exception) {}
         stopSelf()
     }
 
@@ -350,30 +410,37 @@ class DescargaService : Service() {
         liberarLocks()
         actualizarEstado("sin_conexion")
         mostrarNotifPausa("En pausa (sin conexión) · ${porcentaje()}%")
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        try {
+            ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+        } catch (_: Exception) {}
     }
 
     private fun registrarCallbackRed() {
         if (callbackRed != null) return
-        val req = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-        callbackRed = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                hayRed = true
-                // Si estaba esperando conexión, reanudar automáticamente
-                if (pausado && !cancelado && !descargando) {
-                    val estadoActual = EstadoStore.leer(this@DescargaService)
-                    if (estadoActual["estado"] == "sin_conexion") {
-                        reanudar()
-                    }
+        try {
+            val req = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            callbackRed = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    hayRed = true
+                    try {
+                        if (pausado && !cancelado && !descargando) {
+                            val estadoActual = EstadoStore.leer(this@DescargaService)
+                            if (estadoActual["estado"] == "sin_conexion") {
+                                reanudar()
+                            }
+                        }
+                    } catch (_: Exception) {}
+                }
+                override fun onLost(network: Network) {
+                    hayRed = false
                 }
             }
-            override fun onLost(network: Network) {
-                hayRed = false
-            }
+            connectivityManager?.registerNetworkCallback(req, callbackRed!!)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error registrando NetworkCallback", e)
         }
-        try { connectivityManager?.registerNetworkCallback(req, callbackRed!!) } catch (_: Exception) {}
     }
 
     private fun desregistrarCallbackRed() {
@@ -386,39 +453,63 @@ class DescargaService : Service() {
     // ── Locks ─────────────────────────────────────────────────────────────
 
     private fun adquirirLocks() {
-        if (wakeLock == null) {
-            val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "fitolens:descarga").apply {
-                acquire(3 * 60 * 60 * 1000L) // máximo 3 horas (APK grande con señal lenta)
+        try {
+            if (wakeLock == null) {
+                val pm = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                wakeLock = pm?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "fitolens:descarga")?.apply {
+                    acquire(3 * 60 * 60 * 1000L)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo adquirir WakeLock", e)
         }
-        if (wifiLock == null) {
-            val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            @Suppress("DEPRECATION")
-            wifiLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "fitolens:descarga").apply {
-                acquire()
+        try {
+            if (wifiLock == null) {
+                val wm = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                @Suppress("DEPRECATION")
+                wifiLock = wm?.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "fitolens:descarga")?.apply {
+                    acquire()
+                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "No se pudo adquirir WifiLock", e)
         }
     }
 
     private fun liberarLocks() {
-        wakeLock?.let { if (it.isHeld) it.release(); wakeLock = null }
-        wifiLock?.let { if (it.isHeld) it.release(); wifiLock = null }
+        try {
+            wakeLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error liberando WakeLock", e)
+        } finally {
+            wakeLock = null
+        }
+        try {
+            wifiLock?.let { if (it.isHeld) it.release() }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error liberando WifiLock", e)
+        } finally {
+            wifiLock = null
+        }
     }
 
     // ── Notificaciones ────────────────────────────────────────────────────
 
     private fun crearCanal() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val canal = NotificationChannel(
-                CANAL_ID, "Actualizaciones", NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Progreso de descarga de actualizaciones"
-                setSound(null, null)
-                enableVibration(false)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val canal = NotificationChannel(
+                    CANAL_ID, "Actualizaciones", NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Progreso de descarga de actualizaciones"
+                    setSound(null, null)
+                    enableVibration(false)
+                }
+                (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                    ?.createNotificationChannel(canal)
             }
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .createNotificationChannel(canal)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creando canal de notificación", e)
         }
     }
 
@@ -436,63 +527,82 @@ class DescargaService : Service() {
     }
 
     private fun mostrarNotifPausa(texto: String) {
-        val notif = NotificationCompat.Builder(this, CANAL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("Actualizando FitoLens $version")
-            .setContentText(texto)
-            .setProgress(100, porcentaje(), false)
-            .setOngoing(false)
-            .setSilent(true)
-            .addAction(0, "Reanudar", pendingIntentAccion(AccionReceiver.ACCION_REANUDAR))
-            .addAction(0, "Cancelar", pendingIntentAccion(AccionReceiver.ACCION_CANCELAR))
-            .build()
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIF_ID, notif)
+        try {
+            val notif = NotificationCompat.Builder(this, CANAL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("Actualizando FitoLens $version")
+                .setContentText(texto)
+                .setProgress(100, porcentaje(), false)
+                .setOngoing(false)
+                .setSilent(true)
+                .addAction(0, "Reanudar", pendingIntentAccion(AccionReceiver.ACCION_REANUDAR))
+                .addAction(0, "Cancelar", pendingIntentAccion(AccionReceiver.ACCION_CANCELAR))
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                ?.notify(NOTIF_ID, notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando notif pausa", e)
+        }
     }
 
     private fun mostrarNotifLista() {
-        // PendingIntent que abre el instalador al tocar la notificación
-        val dir = getExternalFilesDir("actualizaciones") ?: return
-        val archivo = File(dir, "FitoLens-$version.apk")
-        val authority = "${packageName}.descargaapk.fileprovider"
-        val uri = androidx.core.content.FileProvider.getUriForFile(this, authority, archivo)
+        try {
+            val dir = getExternalFilesDir("actualizaciones") ?: return
+            val archivo = File(dir, "FitoLens-$version.apk")
+            if (!archivo.exists() || archivo.length() == 0L) return
 
-        val intentInstalar = Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(uri, "application/vnd.android.package-archive")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            val authority = "${packageName}.descargaapk.fileprovider"
+            val uri = androidx.core.content.FileProvider.getUriForFile(this, authority, archivo)
+
+            val intentInstalar = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, "application/vnd.android.package-archive")
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            val pi = PendingIntent.getActivity(
+                this, 0, intentInstalar,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            val notif = NotificationCompat.Builder(this, CANAL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("FitoLens $version lista para instalar")
+                .setContentText("Toca para instalar")
+                .setContentIntent(pi)
+                .setAutoCancel(true)
+                .setOngoing(false)
+                .setSilent(true)
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                ?.notify(NOTIF_ID, notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando notif lista", e)
+        } finally {
+            try {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+            } catch (_: Exception) {}
+            stopSelf()
         }
-        val pi = PendingIntent.getActivity(
-            this, 0, intentInstalar,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-
-        val notif = NotificationCompat.Builder(this, CANAL_ID)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
-            .setContentTitle("FitoLens $version lista para instalar")
-            .setContentText("Toca para instalar")
-            .setContentIntent(pi)
-            .setAutoCancel(true)
-            .setOngoing(false)
-            .setSilent(true)
-            .build()
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIF_ID, notif)
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-        stopSelf()
     }
 
     private fun mostrarNotifError(texto: String) {
-        val notif = NotificationCompat.Builder(this, CANAL_ID)
-            .setSmallIcon(android.R.drawable.stat_notify_error)
-            .setContentTitle("Error de actualización")
-            .setContentText(texto)
-            .setOngoing(false)
-            .setSilent(true)
-            .build()
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIF_ID, notif)
-        ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
-        stopSelf()
+        try {
+            val notif = NotificationCompat.Builder(this, CANAL_ID)
+                .setSmallIcon(android.R.drawable.stat_notify_error)
+                .setContentTitle("Error de actualización")
+                .setContentText(texto)
+                .setOngoing(false)
+                .setSilent(true)
+                .build()
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                ?.notify(NOTIF_ID, notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error mostrando notif error", e)
+        } finally {
+            try {
+                ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_DETACH)
+            } catch (_: Exception) {}
+            stopSelf()
+        }
     }
 
     private fun pendingIntentAccion(accion: String): PendingIntent {
@@ -507,19 +617,19 @@ class DescargaService : Service() {
 
     private fun notificarProgreso() {
         val ahora = System.currentTimeMillis()
-        // Máximo 1 actualización por segundo
         if (ahora - ultimaNotif < 1000) return
         ultimaNotif = ahora
 
-        val pct = porcentaje()
-        val texto = textoProgreso()
+        try {
+            val pct = porcentaje()
+            val texto = textoProgreso()
+            val notif = construirNotifProgreso(pct, 100, texto)
+            (getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager)
+                ?.notify(NOTIF_ID, notif)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error notificando progreso", e)
+        }
 
-        // Actualizar notificación
-        val notif = construirNotifProgreso(pct, 100, texto)
-        (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .notify(NOTIF_ID, notif)
-
-        // Guardar y emitir evento a JS
         actualizarEstado("descargando")
     }
 
@@ -561,17 +671,21 @@ class DescargaService : Service() {
     }
 
     private fun actualizarEstado(estado: String, error: String? = null) {
-        EstadoStore.guardar(this, estado, bytesDescargados, totalBytes, version, error)
-        val ahora = System.currentTimeMillis()
-        if (ahora - ultimoEventoJs >= 1000 || estado != "descargando") {
-            ultimoEventoJs = ahora
-            EstadoStore.notificar(this)
+        try {
+            EstadoStore.guardar(this, estado, bytesDescargados, totalBytes, version, error)
+            val ahora = System.currentTimeMillis()
+            if (ahora - ultimoEventoJs >= 1000 || estado != "descargando") {
+                ultimoEventoJs = ahora
+                EstadoStore.notificar(this)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error en actualizarEstado", e)
         }
     }
 
     override fun onDestroy() {
         cancelado = true
-        hiloDescarga?.interrupt()
+        try { hiloDescarga?.interrupt() } catch (_: Exception) {}
         liberarLocks()
         desregistrarCallbackRed()
         super.onDestroy()

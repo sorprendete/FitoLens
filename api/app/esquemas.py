@@ -79,6 +79,14 @@ class ItemHistorial(BaseModel):
     clase: str | None
     confianza: float | None
     provincia: str | None
+    parcela_id: int | None = None
+    parcela_nombre: str | None = None
+
+
+class DiagnosticoParcelaEntrada(BaseModel):
+    diagnostico_id: int
+    severidad: int | None = Field(None, ge=0, le=3)
+    nota: str | None = Field(None, max_length=500)
 
 
 class Vincular(Login):

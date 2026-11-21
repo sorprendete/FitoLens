@@ -138,6 +138,7 @@ input[type="date"]:focus-visible { border-color: var(--acento); box-shadow: 0 0 
 .alerta h2 { font-size: 1.15rem; margin-bottom: .2em; } .alerta p { margin: 0; color: var(--texto); }
 .alerta.mal { background: color-mix(in srgb, var(--mal) 10%, transparent); color: var(--mal); border-color: color-mix(in srgb, var(--mal) 30%, transparent); }
 .alerta.aviso { background: color-mix(in srgb, var(--aviso) 10%, transparent); color: var(--aviso); border-color: color-mix(in srgb, var(--aviso) 30%, transparent); }
+.alerta.ok { background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 30%, transparent); }
 .insignia { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: .78rem; font-weight: 700; white-space: nowrap; }
 .insignia.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
 .insignia.aviso { background: color-mix(in srgb, var(--aviso) 15%, transparent); color: var(--aviso); }

@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.db.modelos import Diagnostico, Parcela, Usuario, VisitaParcela
 from app.db.sesion import db
-from app.esquemas import PROVINCIAS
+from app.esquemas import PROVINCIAS, DiagnosticoParcelaEntrada
 from app.rutas.dependencias import usuario_requerido
 
 router = APIRouter(tags=["parcelas"])
@@ -208,3 +208,81 @@ def borrar_visita(parcela_id: int, visita_id: int, usuario: Usuario = Depends(us
     sesion.delete(v)
     sesion.commit()
     return Response(status_code=204)
+
+
+@router.post("/parcelas/{parcela_id}/diagnosticos", response_model=VisitaSalida, status_code=201)
+def agregar_diagnostico_parcela(
+    parcela_id: int,
+    datos: DiagnosticoParcelaEntrada,
+    usuario: Usuario = Depends(usuario_requerido),
+    sesion: Session = Depends(db),
+):
+    """Agrega un diagnóstico existente a la parcela creando una visita."""
+    p = sesion.get(Parcela, parcela_id)
+    if p is None or p.usuario_id != usuario.id:
+        raise HTTPException(404, "Parcela no encontrada.")
+
+    d = sesion.get(Diagnostico, datos.diagnostico_id)
+    if d is None or d.usuario_id != usuario.id:
+        raise HTTPException(404, "Diagnóstico no encontrado.")
+
+    visita_existente = sesion.scalar(
+        select(VisitaParcela).where(VisitaParcela.diagnostico_id == d.id)
+    )
+    if visita_existente:
+        if visita_existente.parcela_id == p.id:
+            raise HTTPException(409, "El diagnóstico ya está en esa parcela.")
+        raise HTTPException(409, "El diagnóstico ya está en una parcela.")
+
+    severidad = datos.severidad
+    if severidad is None:
+        severidad = 2 if d.enferma else 0
+
+    v = VisitaParcela(
+        parcela_id=p.id,
+        diagnostico_id=d.id,
+        fecha=d.creado,
+        severidad=severidad,
+        nota=(datos.nota or "").strip() or None,
+    )
+    sesion.add(v)
+    sesion.commit()
+    extra = {"clase": d.clase, "confianza": d.confianza, "estado": d.estado}
+    return VisitaSalida.model_validate(v).model_copy(update=extra)
+
+
+@router.delete("/parcelas/{parcela_id}/diagnosticos/{diagnostico_id}", status_code=204)
+def quitar_diagnostico_parcela(
+    parcela_id: int,
+    diagnostico_id: int,
+    usuario: Usuario = Depends(usuario_requerido),
+    sesion: Session = Depends(db),
+):
+    """Quita el diagnóstico de la parcela (borra la visita creada para él o pone diagnostico_id NULL)."""
+    p = sesion.get(Parcela, parcela_id)
+    if p is None or p.usuario_id != usuario.id:
+        raise HTTPException(404, "Parcela no encontrada.")
+
+    d = sesion.get(Diagnostico, diagnostico_id)
+    if d is None or d.usuario_id != usuario.id:
+        raise HTTPException(404, "Diagnóstico no encontrado.")
+
+    visitas = list(
+        sesion.scalars(
+            select(VisitaParcela).where(
+                VisitaParcela.parcela_id == p.id,
+                VisitaParcela.diagnostico_id == d.id,
+            )
+        )
+    )
+    if not visitas:
+        raise HTTPException(404, "El diagnóstico no está en esta parcela.")
+
+    for v in visitas:
+        if v.tratamiento:
+            v.diagnostico_id = None
+        else:
+            sesion.delete(v)
+    sesion.commit()
+    return Response(status_code=204)
+

@@ -99,7 +99,20 @@ export const iniciarSesionGoogle = (id_token) =>
 export const registrarse = (nombre, email, password) =>
   privado(() => pedir('/auth/registro', { metodo: 'POST', json: { nombre, email, password } }), () => mocks.login(email, nombre))
 export const yo = () => privado(() => pedir('/auth/yo'), mocks.yo)
-export const obtenerHistorial = (limite = 200) => privado(() => pedir(`/historial?limite=${limite}`), mocks.historial)
+export function obtenerHistorial(limite = 200, opciones = {}) {
+  let sin_parcela = false
+  if (typeof limite === 'object' && limite !== null) {
+    sin_parcela = Boolean(limite.sin_parcela)
+    limite = limite.limite ?? 200
+  } else if (typeof opciones === 'object' && opciones !== null) {
+    sin_parcela = Boolean(opciones.sin_parcela)
+  }
+  const params = new URLSearchParams({ limite: String(limite) })
+  if (sin_parcela) params.set('sin_parcela', 'true')
+  return privado(() => pedir(`/historial?${params}`), () => mocks.historial({ limite, sin_parcela }))
+}
+export const borrarDiagnostico = (id) =>
+  privado(() => pedir(`/historial/${id}`, { metodo: 'DELETE' }), () => mocks.borrarDiagnostico?.(id))
 
 // --- Administración (rol admin) ---
 export const admin = {
@@ -122,6 +135,8 @@ export const parcelas = {
   borrar: (id) => privado(() => pedir(`/parcelas/${id}`, { metodo: 'DELETE' }), () => mp.borrar(id)),
   visita: (id, d) => privado(() => pedir(`/parcelas/${id}/visitas`, { metodo: 'POST', json: d }), () => mp.visita(id, d)),
   borrarVisita: (id, vid) => privado(() => pedir(`/parcelas/${id}/visitas/${vid}`, { metodo: 'DELETE' }), () => mp.borrarVisita(id, vid)),
+  agregarDiagnostico: (id, d) => privado(() => pedir(`/parcelas/${id}/diagnosticos`, { metodo: 'POST', json: d }), () => mp.agregarDiagnostico(id, d)),
+  quitarDiagnostico: (id, diagId) => privado(() => pedir(`/parcelas/${id}/diagnosticos/${diagId}`, { metodo: 'DELETE' }), () => mp.quitarDiagnostico(id, diagId)),
 }
 
 // --- Teléfonos con la app vinculados a la cuenta ---
