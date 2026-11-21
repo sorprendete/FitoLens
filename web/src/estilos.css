@@ -73,12 +73,18 @@ button, select, input { font: inherit; color: inherit; }
   background: var(--sup); color: var(--texto); box-shadow: inset 0 0 0 1px var(--borde); transition: box-shadow .2s; }
 .icono-btn:hover { box-shadow: inset 0 0 0 1px var(--acento); }
 .girando { width: 18px; height: 18px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: girar .7s linear infinite; }
-select, .entrada { min-height: 44px; border-radius: var(--radio-s); background: var(--sup); border: 1px solid var(--borde-2); }
-select { padding: 0 12px; cursor: pointer; }
+select, .entrada, input[type="date"] { min-height: 44px; border-radius: var(--radio-s); background: var(--sup); border: 1px solid var(--borde-2); color: var(--texto); font: inherit; }
+select { padding: 0 12px; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+select:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); outline: none; }
+select option { background: var(--sup); color: var(--texto); }
+input[type="date"] { padding: 0 12px; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+input[type="date"]:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); outline: none; }
+.campo-inline { display: inline-flex; align-items: center; gap: 8px; font-size: .88rem; color: var(--tenue); }
+.campo > select { width: 100%; }
 .entrada { display: flex; align-items: center; gap: 10px; padding: 0 12px; color: var(--tenue); transition: border-color .2s, box-shadow .2s; }
 .entrada:focus-within { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); }
 .entrada input { flex: 1; min-width: 0; border: 0; background: none; outline: none; color: var(--texto); padding: 11px 0; }
-.campo { display: block; margin-bottom: 14px; } .campo > span { display: block; font-weight: 600; font-size: .88rem; margin-bottom: 6px; }
+.campo { display: block; margin-bottom: 14px; text-align: left; } .campo > span { display: block; font-weight: 600; font-size: .88rem; margin-bottom: 6px; }
 .ojo { border: 0; background: none; color: var(--tenue); cursor: pointer; display: grid; padding: 4px; }
 .segmentado { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 4px; background: var(--fondo-2); border: 1px solid var(--borde); border-radius: 14px; }
 .segmentado button { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 7px 14px; border-radius: 10px; cursor: pointer; color: var(--tenue); font-weight: 600; font-size: .9rem; }
@@ -86,6 +92,19 @@ select { padding: 0 12px; cursor: pointer; }
 .barra-filtros, .filtros, .acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .acciones { margin: 18px 0; }
 .buscador { flex: 1; min-width: min(220px, 100%); }
+
+/* Tarjeta de ubicación en diagnóstico */
+.ubicacion-tarjeta { margin-top: 20px; padding: 18px 20px; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); text-align: left; }
+.ubicacion-label { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: .92rem; color: var(--texto); margin-bottom: 12px; }
+.ubicacion-label svg { color: var(--acento); }
+.ubicacion-fila { display: flex; align-items: center; gap: 10px; }
+.ubicacion-select { flex: 1; min-width: 0; min-height: 44px; border-radius: var(--radio-s); background: var(--sup-2); border: 1px solid var(--borde-2); color: var(--texto); padding: 0 12px; font: inherit; cursor: pointer; transition: border-color .2s, box-shadow .2s; }
+.ubicacion-select:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); outline: none; }
+.ubicacion-btn { flex: none; white-space: nowrap; }
+.ubicacion-gps { margin: 10px 0 0; font-size: .84rem; font-weight: 600; color: var(--acento); text-align: left; }
+.ubicacion-ayuda { margin: 10px 0 0; line-height: 1.4; text-align: left; }
+.voz-select { min-height: 44px; border-radius: var(--radio-s); background: var(--sup); border: 1px solid var(--borde-2); color: var(--texto); padding: 0 12px; cursor: pointer; }
+.voz-select:focus-visible { border-color: var(--acento); box-shadow: 0 0 0 3px color-mix(in srgb, var(--acento) 15%, transparent); outline: none; }
 
 /* ---------- 4. Superficies ---------- */
 .tarjeta { position: relative; background: var(--sup); border: 1px solid var(--borde); border-radius: var(--radio); padding: 22px; box-shadow: var(--sombra); animation: subir .3s ease both; }
@@ -621,48 +640,71 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   .explica-grid,
   .modelos-grid { grid-template-columns: 1fr !important; }
 
-  /* Tarjeta destacada: centrada en móvil */
-  .tarjeta.destacada { flex-direction: column; align-items: center; text-align: center; }
-  .radar { margin: 0 auto 16px; }
+  /* Tarjeta destacada: mantener texto a la izquierda, apilar contenido */
+  .tarjeta.destacada { flex-direction: column; align-items: flex-start; text-align: left; }
+  .radar { margin: 0 auto 16px; align-self: center; }
 
-  /* Acciones/botones: centrados horizontalmente en móvil */
-  .acciones { flex-wrap: wrap; justify-content: center; }
+  /* Acciones: por defecto alineadas a la izquierda; solo hero y estados vacíos se centran */
+  .acciones { flex-wrap: wrap; justify-content: flex-start; }
+  .vacio .acciones { justify-content: center; }
 
-  /* Barra de filtros: centrada en móvil */
-  .barra-filtros { flex-wrap: wrap; justify-content: center; text-align: center; }
+  /* Barra de filtros y formularios: alineados a la izquierda en móvil */
+  .barra-filtros, .filtros { flex-wrap: wrap; justify-content: flex-start; text-align: left; }
+  .barra-filtros > *, .filtros > * { width: 100%; }
+  .campo-inline { width: 100%; justify-content: space-between; }
+  .campo-inline input { flex: 1; }
   .buscador { min-width: 0; width: 100%; }
 
-  /* Portada del diagnóstico en móvil: centrar textos y botones */
+  /* Portada del diagnóstico en móvil: titular hero y botones principales centrados */
   .portada-txt { display: flex; flex-direction: column; align-items: center; text-align: center; }
   .portada-txt .acciones { display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; gap: 12px; }
   .portada-txt .acciones .btn { width: 100%; max-width: 320px; }
-  .ubicacion { justify-content: center; }
   .version-modelo { margin-inline: auto; }
 
-  /* Diagnóstico con foto: mapa y botones centrados */
-  .diag-grid .acciones { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; }
+  /* Tarjeta de ubicación: apilada verticalmente en celular y alineada a la izquierda */
+  .ubicacion-tarjeta { width: 100%; text-align: left; padding: 16px; }
+  .ubicacion-fila { flex-direction: column; align-items: stretch; gap: 10px; width: 100%; }
+  .ubicacion-select { width: 100%; }
+  .ubicacion-btn { width: 100%; justify-content: center; }
+
+  /* Diagnóstico con foto: mapa y botones */
+  .diag-grid .acciones { display: flex; justify-content: flex-start; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .diag-grid .acciones .btn { flex: 1; min-width: 100px; }
   .vision-toggle { margin-inline: auto; }
   .mapa-calor { display: flex; flex-direction: column; align-items: center; }
   .marco img { margin-inline: auto; }
 
-  /* Encabezado de página: apilar */
-  .encabezado { flex-direction: column; align-items: flex-start; }
+  /* Tarjetas de resultado: estrictamente alineadas a la izquierda */
+  .resultado { text-align: left; }
+  .resultado .alerta { text-align: left; }
+  .resultado .alerta div { text-align: left; }
+  .veredicto { flex-wrap: wrap; text-align: left; }
+  .veredicto > div:first-of-type { text-align: left; }
+  .veredicto-conf { width: 100%; text-align: left; }
+  .consejo { text-align: left; }
+  .consejos-foto { text-align: left; }
+  .consejos-grid figure { text-align: left; }
+
+  /* Controles de voz en móvil */
+  .voz { width: 100%; }
+  .voz .btn { flex: 1; }
+  .voz-select { flex: 1; }
+
+  /* Encabezado de página: apilar alineado a la izquierda */
+  .encabezado { flex-direction: column; align-items: flex-start; text-align: left; }
 
   /* Segmentado (periodo): que se adapte */
   .segmentado { flex-wrap: wrap; width: 100%; }
   .segmentado button { flex: 1; }
 
-  /* Tarjeta de bienvenida */
-  .bienvenida { flex-direction: column; align-items: center; text-align: center; }
-  .bienvenida .btn { width: 100%; max-width: 320px; }
-
-  /* Veredicto del diagnóstico: apilar icono + texto */
-  .veredicto { flex-wrap: wrap; }
-  .veredicto-conf { width: 100%; text-align: left; }
+  /* Tarjeta de bienvenida: texto a la izquierda, botón de acción al ancho */
+  .bienvenida { flex-direction: column; align-items: flex-start; text-align: left; gap: 16px; }
+  .bienvenida .btn { width: 100%; max-width: 320px; align-self: stretch; }
 
   /* Donor chart: apilar dona + leyenda */
-  .dona { flex-direction: column; align-items: flex-start; }
+  .dona { flex-direction: column; align-items: center; }
   .dona svg { width: 140px; }
+  .leyenda-lista { width: 100%; }
 
   /* Ranking: reducir gap para que no desborde */
   .ranking li { gap: 6px; font-size: .82rem; }
@@ -689,10 +731,6 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   .rejilla-kpi { grid-template-columns: 1fr 1fr; gap: 10px; }
   .kpi b { font-size: 1.5rem; }
 
-  /* Ubicación (selects de provincia): que se envuelvan */
-  .ubicacion { flex-wrap: wrap; }
-  .ubicacion select { width: 100%; min-width: 0; }
-
   /* Chip de cultivo: no desbordar */
   .chip-cultivo { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -700,6 +738,11 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   .heroe { padding: 20px 12px; }
   .acceso-lado { padding: 20px 12px 32px; }
 
-  /* Formulario de acceso: ancho completo */
-  .acceso-form { width: 100%; max-width: 100%; }
+  /* Formulario de acceso: ancho completo y alineado a la izquierda */
+  .acceso-form { width: 100%; max-width: 100%; text-align: left; }
+}
+
+@media (max-width: 480px) {
+  .consejos-grid { grid-template-columns: 1fr; }
+}
 }

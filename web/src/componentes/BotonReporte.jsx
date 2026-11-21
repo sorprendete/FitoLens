@@ -30,7 +30,7 @@ export default function BotonReporte({ r, archivo }) {
       <button className="btn sec ancho" onClick={descargar} disabled={estado === 'Generando…'}>
         <FileDown />{estado === 'Generando…' ? estado : 'Descargar reporte PDF'}
       </button>
-      {estado && estado !== 'Generando…' && <p className="tenue pequeno">{estado}</p>}
+      {estado && estado !== 'Generando…' && <p className="alerta mal pequeno" role="alert" style={{ marginTop: 8, padding: '8px 12px' }}>{estado}</p>}
     </>
   )
 }

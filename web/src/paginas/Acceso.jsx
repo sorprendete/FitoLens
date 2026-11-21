@@ -15,16 +15,23 @@ export default function Acceso({ modo }) {
   const [tema, cambiarTema] = usarTema()
   const registro = modo === 'registro'
   const [f, setF] = useState({ nombre: '', email: '', password: '' })
+  const [confirmarPassword, setConfirmarPassword] = useState('')
   const [ver, setVer] = useState(false)
+  const [verConfirmar, setVerConfirmar] = useState(false)
   const [error, setError] = useState('')
   const [enviando, setEnviando] = useState(false)
   const cambiar = (k) => (e) => setF({ ...f, [k]: e.target.value })
   const nivel = fuerza(f.password)
+  const noCoinciden = registro && confirmarPassword.length > 0 && f.password !== confirmarPassword
+  const botonDeshabilitado = enviando || (registro && (!confirmarPassword || f.password !== confirmarPassword || nivel < 3))
 
   async function enviar(e) {
     e.preventDefault()
     setError('')
-    if (registro && nivel < 3) return setError('Usa al menos 8 caracteres con mayúsculas, minúsculas y números.')
+    if (registro) {
+      if (nivel < 3) return setError('Usa al menos 8 caracteres con mayúsculas, minúsculas y números.')
+      if (f.password !== confirmarPassword) return setError('Las contraseñas no coinciden.')
+    }
     setEnviando(true)
     try {
       registro ? await s.registrar(f.nombre.trim(), f.email.trim(), f.password) : await s.entrar(f.email.trim(), f.password)
@@ -100,9 +107,19 @@ export default function Acceso({ modo }) {
           {registro && f.password && (
             <div className={`fuerza n${nivel}`} aria-live="polite"><div>{[0, 1, 2, 3].map((i) => <i key={i} />)}</div><small>{TXT_FUERZA[nivel]}</small></div>
           )}
+          {registro && (
+            <label className="campo"><span>Confirmar contraseña</span>
+              <div className="entrada"><Lock size={18} />
+                <input type={verConfirmar ? 'text' : 'password'} required minLength={8} autoComplete="new-password"
+                  value={confirmarPassword} onChange={(e) => setConfirmarPassword(e.target.value)} placeholder="Repite tu contraseña" />
+                <button type="button" className="ojo" onClick={() => setVerConfirmar(!verConfirmar)} aria-label={verConfirmar ? 'Ocultar contraseña' : 'Mostrar contraseña'}>{verConfirmar ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+              </div>
+            </label>
+          )}
+          {noCoinciden && <p className="alerta mal" role="alert">Las contraseñas no coinciden.</p>}
           {error && <p className="alerta mal" role="alert">{error}</p>}
 
-          <button className="btn ancho grande" disabled={enviando}>
+          <button className="btn ancho grande" disabled={botonDeshabilitado}>
             {enviando ? <span className="girando" /> : registro ? <UserPlus size={19} /> : <LogIn size={19} />}
             {registro ? 'Crear cuenta' : 'Ingresar'}
           </button>

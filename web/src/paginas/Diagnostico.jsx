@@ -69,16 +69,24 @@ export default function Diagnostico() {
               <button className="btn grande brillo" onClick={() => setCamara(true)}><Camera />Tomar foto</button>
               <button className="btn grande sec" onClick={() => entrada.current.click()}><ImageUp />Subir foto</button>
             </div>
-            <div className="ubicacion">
-              <label htmlFor="prov"><MapPin size={17} />¿Dónde está tu cultivo?</label>
-              <select id="prov" value={provincia} onChange={(e) => setProvincia(e.target.value)}>
-                <option value="">Prefiero no decirlo</option>
-                {PROVINCIAS.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-              </select>
-              <button className="icono-btn" onClick={ubicar} title="Usar mi ubicación" aria-label="Usar mi ubicación"><LocateFixed size={18} /></button>
-              {gps && <small className="tenue">{gps}</small>}
+            <div className="tarjeta ubicacion-tarjeta">
+              <label htmlFor="prov" className="ubicacion-label">
+                <MapPin size={17} />
+                <span>¿Dónde está tu cultivo?</span>
+              </label>
+              <div className="ubicacion-fila">
+                <select id="prov" className="ubicacion-select" value={provincia} onChange={(e) => setProvincia(e.target.value)}>
+                  <option value="">Prefiero no decirlo</option>
+                  {PROVINCIAS.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
+                </select>
+                <button type="button" className="btn sec ubicacion-btn" onClick={ubicar}>
+                  <LocateFixed size={18} />
+                  <span>Usar mi ubicación</span>
+                </button>
+              </div>
+              {gps && <p className="ubicacion-gps">{gps}</p>}
+              <p className="tenue pequeno ubicacion-ayuda">La provincia alimenta el mapa de brotes de la región. No se envía tu ubicación exacta.</p>
             </div>
-            <p className="tenue pequeno">La provincia alimenta el mapa de brotes de la región. No se envía tu ubicación exacta.</p>
             {version && <p className="version-modelo"><Cpu size={14} />Modelos activos: {version}</p>}
           </div>
           <aside className="tarjeta guia">

@@ -33,7 +33,7 @@ export default function Voz({ r, info, sana }) {
       <button className="btn sec" onClick={hablar} aria-pressed={hablando}>
         {hablando ? <Square /> : <Volume2 />}{hablando ? 'Detener' : 'Escuchar resultado'}
       </button>
-      <select value={idioma} onChange={cambiar} aria-label="Idioma de la voz">
+      <select value={idioma} onChange={cambiar} aria-label="Idioma de la voz" className="voz-select">
         {Object.entries(IDIOMAS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
       </select>
     </div>

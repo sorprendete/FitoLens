@@ -46,7 +46,7 @@ export default function Reporte() {
         <div className="segmentado">
           {[4, 8, 12].map((n) => <button key={n} aria-pressed={semanas === n} onClick={() => setSemanas(n)}>{n} semanas</button>)}
         </div>
-        <label className="tenue">Hasta <input type="date" value={hasta} onChange={(e) => setHasta(e.target.value)} /></label>
+        <label className="campo-inline"><span>Hasta</span><input type="date" className="entrada-fecha" value={hasta} onChange={(e) => setHasta(e.target.value)} /></label>
         <button className="btn" onClick={excel} disabled={bajando || !d}><Download size={17} />{bajando ? 'Generando…' : 'Descargar Excel'}</button>
       </div>
       {error && <p className="alerta mal">{error}</p>}

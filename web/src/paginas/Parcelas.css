@@ -19,3 +19,7 @@
 .ls-trat { stroke: var(--acento-2); stroke-width: 1.5; stroke-dasharray: 4 4; }
 .ls-trazo { fill: none; stroke: var(--tenue); stroke-width: 2; stroke-linejoin: round; }
 .ls-punto { stroke: var(--sup); stroke-width: 2.5; }
+
+@media (max-width: 640px) {
+  .parcela-estado { align-items: flex-start; margin-top: 10px; }
+}
