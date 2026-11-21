@@ -12,7 +12,7 @@ from PIL import Image
 from app.ia import mapa_calor
 from app.ia.modelo import promedio, softmax
 from app.ia.registro import Registro
-from app.ia.segmentacion import Segmentacion, Segmentador, apta_para
+from app.ia.segmentacion import Segmentacion, Segmentador, apta_para, fraccion_huecos_internos
 
 # La segmentación corre en paralelo con el router y el especialista (ONNX libera el GIL).
 _HILOS = ThreadPoolExecutor(max_workers=4, thread_name_prefix="segmentacion")
@@ -26,6 +26,12 @@ _POR_DEFECTO = object()
 # necesita, así que en promedio suma ~40 ms. Medido en pruebas/volteo (README ahí). VOLTEO=false lo apaga.
 LIMITE_VOLTEO = 0.7
 
+# Reglas para maíz: ambigüedad entre cogollero y tizón de la hoja, y daño por mordedura
+MARGEN_AMBIGUEDAD_MAIZ = 0.15
+UMBRAL_HUECOS_MAIZ = 0.03
+PAR_CONFLICTO_MAIZ = ("maiz_gusano_cogollero", "maiz_tizon_hoja")
+MOTIVO_MAIZ_AMBIGUO = "Puede ser gusano cogollero o tizon: revisa si hay huecos o aserrin en la hoja."
+
 NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao",
                    "maiz": "maíz", "limon": "limón", "naranja": "naranja"}
 _VOLTEO = "; como dudaba, revisó también la foto de cabeza"
@@ -38,6 +44,7 @@ MOTIVOS = {
         "El modelo no está seguro. Puede ser un problema que no conoce (plaga, deficiencia, daño "
         "mecánico) o una foto poco clara. No se emite diagnóstico para evitar un error."
     ),
+    "maiz_ambiguo": MOTIVO_MAIZ_AMBIGUO,
 }
 
 
@@ -162,8 +169,30 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     else:
         r.estado, r.clase, r.etiqueta, r.enferma = "diagnostico", clase.id, clase.etiqueta, not clase.sana
 
-    # 4. Dónde está la hoja (calculado en paralelo; solo para mostrar, no cambia el diagnóstico)
+    # Regla de ambigüedad para maíz (probabilidades): si la clase ganadora es tizón o cogollero,
+    # y la otra tiene probabilidad >= 0.15 o la diferencia es < 0.15, se marca como no concluyente.
+    if r.estado == "diagnostico" and cultivo == "maiz" and clase.id in PAR_CONFLICTO_MAIZ:
+        otra_id = "maiz_gusano_cogollero" if clase.id == "maiz_tizon_hoja" else "maiz_tizon_hoja"
+        p_otra = 0.0
+        for k, idx in enumerate(indices):
+            if em.clases[idx].id == otra_id:
+                p_otra = float(p[k])
+                break
+        if p_otra >= MARGEN_AMBIGUEDAD_MAIZ or abs(r.confianza - p_otra) < MARGEN_AMBIGUEDAD_MAIZ:
+            r.estado, r.clase, r.etiqueta, r.enferma = "no_concluyente", None, None, False
+            r.motivo = MOTIVO_MAIZ_AMBIGUO
+
+    # 4. Dónde está la hoja (calculado en paralelo)
     hoja = _hoja(r, tarea, reloj)
+    # Comprobación de daño por mordedura (huecos internos en la hoja) para maíz:
+    # si la segmentación muestra huecos (> 3% del área) y la ganadora es tizón de la hoja,
+    # no se devuelve tizón con confianza alta: devuelve no concluyente.
+    if r.estado == "diagnostico" and cultivo == "maiz" and clase.id == "maiz_tizon_hoja":
+        if hoja is not None and hoja.mascara is not None:
+            if fraccion_huecos_internos(hoja.mascara) > UMBRAL_HUECOS_MAIZ:
+                r.estado, r.clase, r.etiqueta, r.enferma = "no_concluyente", None, None, False
+                r.motivo = MOTIVO_MAIZ_AMBIGUO
+
     if hoja is not None and not apta_para(hoja, cultivo):
         hoja = None
         r.pasos[-1]["detalle"] = "La forma ubicada no parece una sola mazorca; se usa la foto completa"

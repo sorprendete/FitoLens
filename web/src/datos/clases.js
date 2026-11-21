@@ -81,3 +81,6 @@ export function infoClase(id, etiqueta) {
 }
 
 export const esSana = (id = '') => id.endsWith('_sana')
+
+export { NOMBRES_MODELO, nombreModelo } from './modelos'
+

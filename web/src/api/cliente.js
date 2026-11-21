@@ -3,6 +3,7 @@
 //   y la interfaz muestra "Modo demostración".
 // - Cuentas, historial y administración: NUNCA se simulan, salvo con VITE_MODO_DEMO=true.
 import { API_URL, MODO_DEMO, TIEMPO_ESPERA } from '../config'
+import { NOMBRES_MODELO, nombreModelo } from '../datos/modelos'
 import * as mocks from './mocks'
 
 const DEMO_FORZADO = MODO_DEMO === 'true'
@@ -73,11 +74,19 @@ export function diagnosticar(imagen, provincia) {
   }, () => mocks.diagnostico(imagen, provincia))
 }
 export const obtenerBrotes = (desde) => publico(() => pedir(`/brotes?desde=${desde}`), () => mocks.brotes(desde))
-// Versión de los modelos activos, desde /api/salud. Devuelve un texto como "café v1.2 · cacao v1.0".
+// Versión de los modelos activos, desde /api/salud. Devuelve un texto como "Café v1.2 · Cacao v1.0".
 export async function versionModelos() {
   const s = await publico(() => pedir('/salud'), async () => ({ modelo_version: 'demo' }))
-  if (s.version_modelo || s.modelo_version) return s.version_modelo || s.modelo_version
-  return Object.entries(s.modelos ?? {}).map(([n, v]) => `${n} v${String(v).replace(/^v/, '')}`).join(' · ')
+  if (s.version_modelo || s.modelo_version) {
+    let txt = s.version_modelo || s.modelo_version
+    if (txt !== 'demo') {
+      for (const [k, v] of Object.entries(NOMBRES_MODELO)) {
+        txt = txt.replace(new RegExp(`\\b${k}\\b`, 'gi'), v)
+      }
+      return txt
+    }
+  }
+  return Object.entries(s.modelos ?? {}).map(([n, v]) => `${nombreModelo(n)} v${String(v).replace(/^v/, '')}`).join(' · ')
 }
 
 export const obtenerMetricas = () => publico(() => pedir('/metricas'), mocks.metricas)

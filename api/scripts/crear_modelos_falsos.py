@@ -53,13 +53,15 @@ def grafo_onnx(k: int, sesgo: np.ndarray, semilla: int) -> bytes:
     return modelo.SerializeToString()
 
 
-def crear(carpeta: Path, nombre: str, favorita: str | None = None, umbral: float = 0.3) -> None:
+def crear(carpeta: Path, nombre: str, favorita: str | None = None, umbral: float = 0.3,
+          sesgo: np.ndarray | None = None) -> None:
     """`favorita`: clase a la que el modelo da mucha más probabilidad (para tests deterministas)."""
     clases = CLASES[nombre]
     ids = [c for c, _ in clases]
-    sesgo = np.zeros(len(ids))
-    if favorita:
-        sesgo[ids.index(favorita)] = 10.0
+    if sesgo is None:
+        sesgo = np.zeros(len(ids))
+        if favorita:
+            sesgo[ids.index(favorita)] = 10.0
     datos = grafo_onnx(len(ids), sesgo, semilla=len(nombre))
     destino = carpeta / nombre
     destino.mkdir(parents=True, exist_ok=True)

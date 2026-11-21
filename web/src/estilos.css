@@ -621,15 +621,29 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   .explica-grid,
   .modelos-grid { grid-template-columns: 1fr !important; }
 
-  /* Tarjeta destacada (parcelas): apilar verticalmente */
-  .tarjeta.destacada { flex-direction: column; align-items: flex-start; }
+  /* Tarjeta destacada: centrada en móvil */
+  .tarjeta.destacada { flex-direction: column; align-items: center; text-align: center; }
+  .radar { margin: 0 auto 16px; }
 
-  /* Acciones/botones: que no desborden */
-  .acciones { flex-wrap: wrap; }
+  /* Acciones/botones: centrados horizontalmente en móvil */
+  .acciones { flex-wrap: wrap; justify-content: center; }
 
-  /* Barra de filtros: buscador ocupa todo el ancho */
-  .barra-filtros { flex-wrap: wrap; }
+  /* Barra de filtros: centrada en móvil */
+  .barra-filtros { flex-wrap: wrap; justify-content: center; text-align: center; }
   .buscador { min-width: 0; width: 100%; }
+
+  /* Portada del diagnóstico en móvil: centrar textos y botones */
+  .portada-txt { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .portada-txt .acciones { display: flex; flex-direction: column; align-items: center; text-align: center; width: 100%; gap: 12px; }
+  .portada-txt .acciones .btn { width: 100%; max-width: 320px; }
+  .ubicacion { justify-content: center; }
+  .version-modelo { margin-inline: auto; }
+
+  /* Diagnóstico con foto: mapa y botones centrados */
+  .diag-grid .acciones { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 10px; }
+  .vision-toggle { margin-inline: auto; }
+  .mapa-calor { display: flex; flex-direction: column; align-items: center; }
+  .marco img { margin-inline: auto; }
 
   /* Encabezado de página: apilar */
   .encabezado { flex-direction: column; align-items: flex-start; }
@@ -639,7 +653,8 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   .segmentado button { flex: 1; }
 
   /* Tarjeta de bienvenida */
-  .bienvenida { flex-direction: column; }
+  .bienvenida { flex-direction: column; align-items: center; text-align: center; }
+  .bienvenida .btn { width: 100%; max-width: 320px; }
 
   /* Veredicto del diagnóstico: apilar icono + texto */
   .veredicto { flex-wrap: wrap; }
@@ -658,7 +673,8 @@ body::after { /* aurora: tres manchas de color que derivan muy lento */
   /* Tabla de confusión: scroll horizontal dentro de su contenedor */
   .matriz { overflow-x: auto; }
 
-  /* Heroe cifras (login): ocultar ya lo hace la media 860px, aquí ok */
+  /* Ilustración escaneo de acceso (login): centrada en móvil */
+  .escaneo { margin-inline: auto; }
 
   /* Imagen del diagnóstico: nunca más ancha que el viewport */
   .marco img { max-width: 100%; }

@@ -5,6 +5,7 @@ import { Columnas, Dona, Kpi, Leyenda, Ranking } from '../componentes/Graficos'
 import { ESTADO } from '../datos/paleta'
 import { useSesion } from '../contexto/Sesion'
 import { CULTIVOS, esSana, infoClase } from '../datos/clases'
+import { nombreModelo } from '../datos/modelos'
 import { pct } from '../datos/utiles'
 
 export default function Panel() {
@@ -71,8 +72,8 @@ export default function Panel() {
           <header className="tarjeta-cab"><h3>Modelos en uso</h3><a href="#modelos" className="enlace">Ver precisión en campo →</a></header>
           <div className="modelos-mini">
             {modelos.map((m) => (
-              <div key={m.id} className="modelo-mini" style={{ '--c': m.id === 'hortalizas' ? 'var(--acento)' : CULTIVOS[m.cultivo]?.color }}>
-                <span>{m.id === 'hortalizas' ? 'Hortalizas' : CULTIVOS[m.cultivo]?.nombre ?? m.id}</span>
+              <div key={m.id} className="modelo-mini" style={{ '--c': m.id === 'hortalizas' ? 'var(--acento)' : m.id === 'citricos' ? '#84cc16' : CULTIVOS[m.cultivo]?.color }}>
+                <span>{nombreModelo(m.id)}</span>
                 <b>{pct(m.campo?.accuracy)}</b><small>acierto en campo</small>
               </div>
             ))}

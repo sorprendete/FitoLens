@@ -44,6 +44,10 @@ class Ajustes(BaseSettings):
     alerta_umbral_casos: int = 3
     alerta_ventana_dias: int = 7
 
+    # Ambigüedad maíz (cogollero vs tizón de la hoja)
+    maiz_margen_ambiguedad: float = 0.15
+    maiz_umbral_huecos: float = 0.03
+
     log_nivel: str = "INFO"
 
     @property

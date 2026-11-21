@@ -28,11 +28,14 @@
 .acceso-app b { color: var(--acento); }
 .acceso-app:hover b { text-decoration: underline; }
 
-@media (max-width: 600px) {
+@media (max-width: 640px) {
   .am-icono { display: none; }
-  .am-descarga { flex-direction: column; align-items: flex-start; }
-  .am-qr { width: 120px; height: 120px; }
+  .am-descarga { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .am-descarga-txt { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .am-qr { width: 140px; height: 140px; margin-inline: auto; }
+  .am-datos { display: flex; justify-content: center; text-align: center; }
   .am-pasos { grid-template-columns: 1fr; }
-  .am-portada { flex-direction: column; }
-  .am-portada-txt { max-width: 100%; }
+  .am-portada { flex-direction: column; align-items: center; text-align: center; }
+  .am-portada-txt { max-width: 100%; text-align: center; }
+  .am-ventajas { justify-content: center; }
 }

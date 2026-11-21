@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { esDemo, obtenerMetricas } from '../api/cliente'
 import Barra from '../componentes/Barra'
-import { CULTIVOS, infoClase } from '../datos/clases'
+import { infoClase } from '../datos/clases'
+import { nombreModelo } from '../datos/modelos'
 
 export default function Modelos() {
   const [datos, setDatos] = useState(null)
@@ -30,12 +31,11 @@ export default function Modelos() {
 }
 
 function Ficha({ m }) {
-  const cultivo = CULTIVOS[m.cultivo]
   const campo = m.campo ?? {}
   return (
     <article className="tarjeta ficha">
       <header>
-        <h2>{m.id === 'hortalizas' ? 'Hortalizas' : cultivo?.nombre ?? m.id}</h2>
+        <h2>{nombreModelo(m.id)}</h2>
         <span className="tenue">{m.backbone} · v{m.version}</span>
       </header>
       <div className="cifra-grande"><b>{Math.round((campo.accuracy ?? 0) * 100)}<small>%</small></b><span>de acierto en campo</span></div>

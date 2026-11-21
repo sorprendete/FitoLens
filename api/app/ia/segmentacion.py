@@ -53,10 +53,21 @@ class Segmentacion:
     solidez: float = 0.0  # área / área de su envolvente convexa (la peor de las regiones); 1 = convexa
     contorno: list[list[list[float]]] = field(default_factory=list)  # polígonos de [x, y] en 0-1
     motivo: str | None = None
+    fraccion_huecos: float = 0.0
 
 
 def _fallo(motivo: str, **datos) -> Segmentacion:
     return Segmentacion(ok=False, motivo=motivo, **datos)
+
+
+def fraccion_huecos_internos(mascara: np.ndarray | None) -> float:
+    """Calcula la fracción de huecos internos (fondo encerrado) respecto al área de la hoja."""
+    if mascara is None or not mascara.any():
+        return 0.0
+    llena = ndimage.binary_fill_holes(mascara)
+    huecos = llena & (~mascara)
+    area_llena = float(llena.sum())
+    return float(huecos.sum()) / area_llena if area_llena > 0 else 0.0
 
 
 class Segmentador:
@@ -112,15 +123,20 @@ def analizar(p: np.ndarray) -> Segmentacion:
     orden = np.argsort(areas)[::-1]
     minimo = max(0.15 * areas[orden[0]], 0.005 * m.size)  # descarta motas sueltas
     elegidas = [int(k) + 1 for k in orden[:MAX_POLIGONOS] if areas[k] >= minimo]
-    m = ndimage.binary_fill_holes(np.isin(etiquetas, elegidas))
+    m = np.isin(etiquetas, elegidas)  # conserva huecos internos de daño o mordedura
+    llena = ndimage.binary_fill_holes(m)
+    huecos = llena & (~m)
+    area_llena = float(llena.sum())
+    fraccion_huecos = float(huecos.sum()) / area_llena if area_llena > 0 else 0.0
 
     cobertura = float(m.mean())
     # Nitidez: en una máscara confiable casi todos los píxeles del objeto y de una franja alrededor están cerca
     # de 0 o de 1. Se mide solo ahí: una bruma tenue lejos del objeto (tronco, follaje) no lo vuelve dudoso.
-    zona = ndimage.binary_dilation(m, iterations=6)
+    zona = ndimage.binary_dilation(llena, iterations=6)
     confianza = float(np.abs(2 * p[zona] - 1).mean())
     nucleo = float((p[m] > 0.8).mean()) if m.any() else 0.0
-    datos = dict(mascara=m, cobertura=round(cobertura, 4), confianza=round(confianza, 4), nucleo=round(nucleo, 4))
+    datos = dict(mascara=m, cobertura=round(cobertura, 4), confianza=round(confianza, 4), nucleo=round(nucleo, 4),
+                 fraccion_huecos=round(fraccion_huecos, 4))
     if cobertura < COBERTURA_MIN:
         return _fallo("muy_pequena", **datos)
     if cobertura > COBERTURA_MAX:
