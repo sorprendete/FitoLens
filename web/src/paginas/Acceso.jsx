@@ -55,7 +55,7 @@ export default function Acceso({ modo }) {
           theme: tema === 'oscuro' ? 'filled_black' : 'outline',
           size: 'large',
           // Mismo ancho que el botón Ingresar (Google admite hasta 400 px)
-          width: Math.max(200, Math.min(400, googleBtnRef.current.parentElement?.clientWidth || 320)),
+          width: Math.max(200, Math.min(400, googleBtnRef.current.parentElement?.querySelector('.btn.ancho')?.offsetWidth || 320)),
           shape: 'rectangular',
           text: registro ? 'signup_with' : 'signin_with',
           locale: 'es',
