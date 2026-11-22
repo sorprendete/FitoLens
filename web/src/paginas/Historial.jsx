@@ -249,74 +249,76 @@ export default function Historial() {
       {aviso && <p className="alerta ok">{aviso}</p>}
       {error && <p className="alerta mal">{error}</p>}
       <section className="tarjeta sin-relleno">
-        <table className="tabla">
-          <thead><tr><th>Fecha</th><th>Cultivo</th><th>Resultado</th><th>Confianza</th><th>Provincia</th><th>Desde</th><th>Estado</th><th>Parcela</th><th>Acciones</th></tr></thead>
-          <tbody>
-            {items === null && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="9"><i /></td></tr>)}
-            {filas.map((i) => (
-              <tr key={i.id}>
-                <td data-l="Fecha">{new Date(i.creado).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</td>
-                <td data-l="Cultivo">{i.cultivo ? <span className="punto-txt" style={{ '--c': CULTIVOS[i.cultivo]?.color }}>{CULTIVOS[i.cultivo]?.nombre}</span> : '—'}</td>
-                <td data-l="Resultado" className="principal">
-                  {i.clase ? infoClase(i.clase, i.etiqueta).nombre : 'Foto no válida'}
-                  {i.clase && infoClase(i.clase, i.etiqueta).urgencia !== 'ninguna' && (
-                    <small className="tenue" style={{ display: 'block', fontSize: '.75rem', color: infoClase(i.clase, i.etiqueta).urgencia === 'critica' || infoClase(i.clase, i.etiqueta).urgencia === 'alta' ? 'var(--mal)' : 'var(--aviso)' }}>
-                      Urgencia {infoClase(i.clase, i.etiqueta).urgencia}
-                    </small>
-                  )}
-                </td>
-                <td data-l="Confianza">{i.confianza != null ? pct(i.confianza) : '—'}</td>
-                <td data-l="Provincia">{nombreProv[i.provincia] ?? '—'}</td>
-                <td data-l="Desde">{ORIGENES[i.origen] ?? '—'}</td>
-                <td data-l="Estado"><span className={`insignia ${i.estado === 'rechazada' ? 'neutro' : i.estado === 'no_concluyente' ? 'aviso' : esSana(i.clase) ? 'ok' : 'mal'}`}>
-                  {i.estado === 'diagnostico' ? (esSana(i.clase) ? 'Sana' : 'Enferma') : ESTADOS[i.estado]}</span></td>
-                <td data-l="Parcela">
-                  {i.parcela_nombre ? (
-                    <span className="insignia neutro" title="Parcela asignada">{i.parcela_nombre}</span>
-                  ) : (
-                    <span className="tenue">—</span>
-                  )}
-                </td>
-                <td data-l="Acciones">
-                  <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {i.parcela_id ? (
+        <div className="tabla-contenedor">
+          <table className="tabla">
+            <thead><tr><th>Fecha</th><th>Cultivo</th><th>Resultado</th><th>Confianza</th><th>Provincia</th><th>Desde</th><th>Estado</th><th>Parcela</th><th>Acciones</th></tr></thead>
+            <tbody>
+              {items === null && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="9"><i /></td></tr>)}
+              {filas.map((i) => (
+                <tr key={i.id}>
+                  <td data-l="Fecha">{new Date(i.creado).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' })}</td>
+                  <td data-l="Cultivo">{i.cultivo ? <span className="punto-txt" style={{ '--c': CULTIVOS[i.cultivo]?.color }}>{CULTIVOS[i.cultivo]?.nombre}</span> : '—'}</td>
+                  <td data-l="Resultado" className="principal">
+                    {i.clase ? infoClase(i.clase, i.etiqueta).nombre : 'Foto no válida'}
+                    {i.clase && infoClase(i.clase, i.etiqueta).urgencia !== 'ninguna' && (
+                      <small className="tenue" style={{ display: 'block', fontSize: '.75rem', color: infoClase(i.clase, i.etiqueta).urgencia === 'critica' || infoClase(i.clase, i.etiqueta).urgencia === 'alta' ? 'var(--mal)' : 'var(--aviso)' }}>
+                        Urgencia {infoClase(i.clase, i.etiqueta).urgencia}
+                      </small>
+                    )}
+                  </td>
+                  <td data-l="Confianza">{i.confianza != null ? pct(i.confianza) : '—'}</td>
+                  <td data-l="Provincia">{nombreProv[i.provincia] ?? '—'}</td>
+                  <td data-l="Desde">{ORIGENES[i.origen] ?? '—'}</td>
+                  <td data-l="Estado"><span className={`insignia ${i.estado === 'rechazada' ? 'neutro' : i.estado === 'no_concluyente' ? 'aviso' : esSana(i.clase) ? 'ok' : 'mal'}`}>
+                    {i.estado === 'diagnostico' ? (esSana(i.clase) ? 'Sana' : 'Enferma') : ESTADOS[i.estado]}</span></td>
+                  <td data-l="Parcela">
+                    {i.parcela_nombre ? (
+                      <span className="insignia neutro" title="Parcela asignada">{i.parcela_nombre}</span>
+                    ) : (
+                      <span className="tenue">—</span>
+                    )}
+                  </td>
+                  <td data-l="Acciones">
+                    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+                      {i.parcela_id ? (
+                        <button
+                          type="button"
+                          className="btn sec chico"
+                          onClick={() => quitarDeParcela(i.parcela_id, i.id)}
+                          title="Quitar de la parcela"
+                        >
+                          Quitar de la parcela
+                        </button>
+                      ) : (
+                        <select
+                          className="btn sec chico"
+                          style={{ padding: '4px 8px', fontSize: '.78rem', cursor: 'pointer' }}
+                          value=""
+                          onChange={(e) => agregarAParcela(i.id, e.target.value)}
+                          aria-label="Agregar a parcela"
+                        >
+                          <option value="" disabled>Agregar a parcela…</option>
+                          {listaParcelas.map((p) => (
+                            <option key={p.id} value={p.id}>{p.nombre}</option>
+                          ))}
+                        </select>
+                      )}
                       <button
                         type="button"
-                        className="btn sec chico"
-                        onClick={() => quitarDeParcela(i.parcela_id, i.id)}
-                        title="Quitar de la parcela"
+                        className="btn sec chico peligro"
+                        style={{ padding: '4px 8px', fontSize: '.78rem' }}
+                        onClick={() => borrar(i.id)}
+                        title="Borrar diagnóstico"
                       >
-                        Quitar de la parcela
+                        Borrar
                       </button>
-                    ) : (
-                      <select
-                        className="btn sec chico"
-                        style={{ padding: '4px 8px', fontSize: '.78rem', cursor: 'pointer' }}
-                        value=""
-                        onChange={(e) => agregarAParcela(i.id, e.target.value)}
-                        aria-label="Agregar a parcela"
-                      >
-                        <option value="" disabled>Agregar a parcela…</option>
-                        {listaParcelas.map((p) => (
-                          <option key={p.id} value={p.id}>{p.nombre}</option>
-                        ))}
-                      </select>
-                    )}
-                    <button
-                      type="button"
-                      className="btn sec chico peligro"
-                      style={{ padding: '4px 8px', fontSize: '.78rem' }}
-                      onClick={() => borrar(i.id)}
-                      title="Borrar diagnóstico"
-                    >
-                      Borrar
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {items && !filas.length && (
           <div style={{ textAlign: 'center', padding: '36px 16px' }}>
             <p className="tenue" style={{ marginBottom: 10 }}>
@@ -357,19 +359,21 @@ function Telefonos() {
       <h3><Smartphone size={18} /> Teléfonos vinculados</h3>
       <p className="tenue pequeno">Si pierdes un teléfono, desvincúlalo: dejará de poder subir datos a tu cuenta.</p>
       {error && <p className="alerta mal">{error}</p>}
-      <table className="tabla">
-        <thead><tr><th>Teléfono</th><th>Vinculado</th><th>Último uso</th><th /></tr></thead>
-        <tbody>
-          {(lista ?? []).map((d) => (
-            <tr key={d.id}>
-              <td data-l="Teléfono" className="principal">{d.nombre}</td>
-              <td data-l="Vinculado">{new Date(d.creado).toLocaleDateString('es-PE', { dateStyle: 'medium' })}</td>
-              <td data-l="Último uso">{d.ultimo_uso ? new Date(d.ultimo_uso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
-              <td><button className="btn sec" onClick={() => desvincular(d)}>Desvincular</button></td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="tabla-contenedor">
+        <table className="tabla">
+          <thead><tr><th>Teléfono</th><th>Vinculado</th><th>Último uso</th><th /></tr></thead>
+          <tbody>
+            {(lista ?? []).map((d) => (
+              <tr key={d.id}>
+                <td data-l="Teléfono" className="principal">{d.nombre}</td>
+                <td data-l="Vinculado">{new Date(d.creado).toLocaleDateString('es-PE', { dateStyle: 'medium' })}</td>
+                <td data-l="Último uso">{d.ultimo_uso ? new Date(d.ultimo_uso).toLocaleString('es-PE', { dateStyle: 'medium', timeStyle: 'short' }) : '—'}</td>
+                <td><button className="btn sec" onClick={() => desvincular(d)}>Desvincular</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </section>
   )
 }

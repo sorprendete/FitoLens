@@ -71,23 +71,25 @@ export default function Riesgos() {
       </div>
 
       <section className="tarjeta sin-relleno">
-        <table className="tabla">
-          <thead><tr><th>ID</th><th>Riesgo</th><th>Pilar</th><th>Inherente</th><th>Residual</th></tr></thead>
-          <tbody>
-            {[...riesgos].sort((a, b) => b.probabilidad * b.impacto - a.probabilidad * a.impacto).map((r) => {
-              const ri = r.probabilidad * r.impacto, rr = r.residual.probabilidad * r.residual.impacto
-              return (
-                <tr key={r.id} onClick={() => setActivo(r.id)} className={`clicable ${activo === r.id ? 'sel' : ''}`}>
-                  <td data-l="ID"><b>{r.id}</b></td>
-                  <td data-l="Riesgo" className="principal">{r.amenaza}<small className="tenue bloque-txt">{r.activo}</small></td>
-                  <td data-l="Pilar">{r.pilar}</td>
-                  <td data-l="Inherente"><span className={`insignia ${TONO[nivel(ri)]}`}>{ri} · {TEXTO[nivel(ri)]}</span></td>
-                  <td data-l="Residual"><span className={`insignia ${TONO[nivel(rr)]}`}>{rr} · {TEXTO[nivel(rr)]}</span></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <div className="tabla-contenedor">
+          <table className="tabla">
+            <thead><tr><th>ID</th><th>Riesgo</th><th>Pilar</th><th>Inherente</th><th>Residual</th></tr></thead>
+            <tbody>
+              {[...riesgos].sort((a, b) => b.probabilidad * b.impacto - a.probabilidad * a.impacto).map((r) => {
+                const ri = r.probabilidad * r.impacto, rr = r.residual.probabilidad * r.residual.impacto
+                return (
+                  <tr key={r.id} onClick={() => setActivo(r.id)} className={`clicable ${activo === r.id ? 'sel' : ''}`}>
+                    <td data-l="ID"><b>{r.id}</b></td>
+                    <td data-l="Riesgo" className="principal">{r.amenaza}<small className="tenue bloque-txt">{r.activo}</small></td>
+                    <td data-l="Pilar">{r.pilar}</td>
+                    <td data-l="Inherente"><span className={`insignia ${TONO[nivel(ri)]}`}>{ri} · {TEXTO[nivel(ri)]}</span></td>
+                    <td data-l="Residual"><span className={`insignia ${TONO[nivel(rr)]}`}>{rr} · {TEXTO[nivel(rr)]}</span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   )

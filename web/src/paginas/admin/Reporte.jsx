@@ -62,26 +62,28 @@ export default function Reporte() {
       </>}
 
       <section className="tarjeta sin-relleno">
-        <table className="tabla">
-          <thead><tr><th>Provincia</th><th>Cultivo</th><th>Diagnósticos</th><th>Con enfermedad</th><th>Enfermedad principal</th><th>Por semana</th><th>Tendencia</th></tr></thead>
-          <tbody>
-            {!d && !error && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="7"><i /></td></tr>)}
-            {d?.filas.map((f) => {
-              const [txt, tono] = TENDENCIA[f.tendencia] ?? [f.tendencia, 'neutro']
-              return (
-                <tr key={f.provincia + f.cultivo}>
-                  <td data-l="Provincia" className="principal">{f.provincia_nombre}</td>
-                  <td data-l="Cultivo"><span className="chip-cultivo" style={{ '--c': CULTIVOS[f.cultivo]?.color ?? 'var(--tenue)' }}>{f.cultivo_nombre}</span></td>
-                  <td data-l="Diagnósticos">{f.analisis}</td>
-                  <td data-l="Con enfermedad">{f.enfermos} <small className="tenue">({pct(f.pct_enfermos)})</small></td>
-                  <td data-l="Enfermedad principal" title={f.enfermedades.map((e) => `${e.etiqueta}: ${e.casos}`).join('\n')}>{f.principal ? `${f.principal.etiqueta} (${f.principal.casos})` : '—'}</td>
-                  <td data-l="Por semana"><Barras serie={f.enfermos_por_semana} /></td>
-                  <td data-l="Tendencia"><span className={`insignia ${tono}`}>{txt}{f.tendencia_pct != null && f.tendencia_pct !== 0 ? ` ${f.tendencia_pct > 0 ? '+' : ''}${f.tendencia_pct}%` : ''}</span></td>
-                </tr>
-              )
-            })}
-          </tbody>
-        </table>
+        <div className="tabla-contenedor">
+          <table className="tabla">
+            <thead><tr><th>Provincia</th><th>Cultivo</th><th>Diagnósticos</th><th>Con enfermedad</th><th>Enfermedad principal</th><th>Por semana</th><th>Tendencia</th></tr></thead>
+            <tbody>
+              {!d && !error && Array.from({ length: 6 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="7"><i /></td></tr>)}
+              {d?.filas.map((f) => {
+                const [txt, tono] = TENDENCIA[f.tendencia] ?? [f.tendencia, 'neutro']
+                return (
+                  <tr key={f.provincia + f.cultivo}>
+                    <td data-l="Provincia" className="principal">{f.provincia_nombre}</td>
+                    <td data-l="Cultivo"><span className="chip-cultivo" style={{ '--c': CULTIVOS[f.cultivo]?.color ?? 'var(--tenue)' }}>{f.cultivo_nombre}</span></td>
+                    <td data-l="Diagnósticos">{f.analisis}</td>
+                    <td data-l="Con enfermedad">{f.enfermos} <small className="tenue">({pct(f.pct_enfermos)})</small></td>
+                    <td data-l="Enfermedad principal" title={f.enfermedades.map((e) => `${e.etiqueta}: ${e.casos}`).join('\n')}>{f.principal ? `${f.principal.etiqueta} (${f.principal.casos})` : '—'}</td>
+                    <td data-l="Por semana"><Barras serie={f.enfermos_por_semana} /></td>
+                    <td data-l="Tendencia"><span className={`insignia ${tono}`}>{txt}{f.tendencia_pct != null && f.tendencia_pct !== 0 ? ` ${f.tendencia_pct > 0 ? '+' : ''}${f.tendencia_pct}%` : ''}</span></td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
         {d && !d.filas.length && <p className="tenue centro relleno">Sin diagnósticos en este periodo.</p>}
       </section>
 

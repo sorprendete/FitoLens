@@ -40,8 +40,8 @@ export default function Shell({ ruta, children }) {
           <div className="sello"><ShieldCheck size={16} /><span>Modelos verificados con SHA-256 · HTTPS · sesión JWT</span></div>
           {s.usuario ? (
             <div className="usuario">
-              <span className="avatar">{inicial}</span>
-              <div><b>{s.usuario.nombre}</b><small>{s.esAdmin ? 'Administrador' : s.usuario.email}</small></div>
+              <a href="#perfil" className="avatar" title="Mi perfil" style={{ textDecoration: 'none' }}>{inicial}</a>
+              <div><b><a href="#perfil" style={{ textDecoration: 'none', color: 'inherit' }} title="Mi perfil">{s.usuario.nombre}</a></b><small>{s.esAdmin ? 'Administrador' : s.usuario.email}</small></div>
               <button className="icono-btn" onClick={s.salir} title="Cerrar sesión" aria-label="Cerrar sesión"><LogOut size={18} /></button>
             </div>
           ) : (

@@ -3,7 +3,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { GoogleSignin, isSuccessResponse, statusCodes } from '@react-native-google-signin/google-signin'
 import { ModoTema, useTema } from './tema'
-import { PROVINCIAS, alCambiar, cerrarSesion, cuentaActual, elegirProvincia, iniciarSesion, iniciarSesionGoogle, provinciaActual } from './cuenta'
+import {
+  PROVINCIAS,
+  actualizarNombre,
+  alCambiar,
+  cambiarContrasena,
+  cerrarSesion,
+  cuentaActual,
+  elegirProvincia,
+  iniciarSesion,
+  iniciarSesionGoogle,
+  provinciaActual,
+} from './cuenta'
 import { pendientes, sincronizar } from './historial'
 import { API, enLinea } from './servidor'
 import MisCultivos from './MisCultivos'
@@ -55,7 +66,14 @@ export default function Cuenta() {
       </View>
 
       {/* 2. Sesión / Vinculación */}
-      {cuenta ? <Vinculada pend={pend} actualizar={actualizar} /> : <Ingresar />}
+      {cuenta ? (
+        <>
+          <Vinculada pend={pend} actualizar={actualizar} />
+          <MiPerfil />
+        </>
+      ) : (
+        <Ingresar />
+      )}
 
       {/* 3. Mis cultivos descargados */}
       <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }]}>
@@ -207,6 +225,202 @@ function Vinculada({ pend, actualizar }: { pend: number; actualizar: () => void 
   )
 }
 
+function MiPerfil() {
+  const { colores: C } = useTema()
+  const cuenta = cuentaActual()!
+  const [nombre, setNombre] = useState(cuenta.nombre)
+  const [guardandoNombre, setGuardandoNombre] = useState(false)
+  const [exitoNombre, setExitoNombre] = useState<string | null>(null)
+  const [errorNombre, setErrorNombre] = useState<string | null>(null)
+
+  const [actual, setActual] = useState('')
+  const [nueva, setNueva] = useState('')
+  const [confirmar, setConfirmar] = useState('')
+  const [mostrarActual, setMostrarActual] = useState(false)
+  const [mostrarNueva, setMostrarNueva] = useState(false)
+  const [mostrarConfirmar, setMostrarConfirmar] = useState(false)
+  const [guardandoClave, setGuardandoClave] = useState(false)
+  const [exitoClave, setExitoClave] = useState<string | null>(null)
+  const [errorClave, setErrorClave] = useState<string | null>(null)
+
+  useEffect(() => {
+    setNombre(cuenta.nombre)
+  }, [cuenta.nombre])
+
+  const guardarDatos = async () => {
+    setErrorNombre(null)
+    setExitoNombre(null)
+    const limpio = nombre.trim()
+    if (limpio.length < 2 || limpio.length > 120) {
+      setErrorNombre('El nombre debe tener entre 2 y 120 caracteres.')
+      return
+    }
+    setGuardandoNombre(true)
+    try {
+      await actualizarNombre(limpio)
+      setExitoNombre('Nombre actualizado correctamente.')
+    } catch (e: any) {
+      setErrorNombre(e?.message ?? 'No se pudo actualizar el nombre.')
+    } finally {
+      setGuardandoNombre(false)
+    }
+  }
+
+  const guardarClave = async () => {
+    setErrorClave(null)
+    setExitoClave(null)
+    if (!actual) {
+      setErrorClave('Ingresa tu contraseña actual.')
+      return
+    }
+    if (nueva.length < 8) {
+      setErrorClave('La nueva contraseña debe tener al menos 8 caracteres.')
+      return
+    }
+    if (nueva !== confirmar) {
+      setErrorClave('Las contraseñas no coinciden.')
+      return
+    }
+    setGuardandoClave(true)
+    try {
+      await cambiarContrasena(actual, nueva)
+      setExitoClave('Contraseña actualizada correctamente.')
+      setActual('')
+      setNueva('')
+      setConfirmar('')
+    } catch (e: any) {
+      setErrorClave(e?.message ?? 'No se pudo cambiar la contraseña.')
+    } finally {
+      setGuardandoClave(false)
+    }
+  }
+
+  return (
+    <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }]}>
+      <Text style={[s.sobre, { color: C.acento }]}>MI PERFIL</Text>
+      <Text style={[s.titulo, { color: C.texto }]}>Datos de tu cuenta</Text>
+
+      <Text style={[s.tenue, { color: C.tenue }]}>Correo electrónico (solo lectura):</Text>
+      <TextInput
+        style={[s.campo, { backgroundColor: C.fondo2, borderColor: C.borde2, color: C.tenue, opacity: 0.8 }]}
+        value={cuenta.email}
+        editable={false}
+      />
+
+      <Text style={[s.tenue, { color: C.tenue, marginTop: 4 }]}>Nombre completo:</Text>
+      <TextInput
+        style={[s.campo, { backgroundColor: C.fondo2, borderColor: C.borde2, color: C.texto }]}
+        placeholder="Tu nombre"
+        placeholderTextColor={C.tenue}
+        value={nombre}
+        onChangeText={setNombre}
+      />
+
+      {errorNombre && <Text style={{ color: C.coral }}>{errorNombre}</Text>}
+      {exitoNombre && <Text style={{ color: C.acento }}>{exitoNombre}</Text>}
+
+      <Pressable
+        onPress={guardarDatos}
+        disabled={guardandoNombre || !nombre.trim() || nombre.trim() === cuenta.nombre}
+        style={({ pressed }) => [
+          s.boton,
+          { backgroundColor: C.acento },
+          (pressed || guardandoNombre || !nombre.trim() || nombre.trim() === cuenta.nombre) && { opacity: 0.6 },
+        ]}
+      >
+        {guardandoNombre ? (
+          <ActivityIndicator color={C.textoBotonAcento} />
+        ) : (
+          <Text style={[s.botonTxt, { color: C.textoBotonAcento }]}>Guardar nombre</Text>
+        )}
+      </Pressable>
+
+      <View style={[s.lineaSeparador, { backgroundColor: C.borde2, marginVertical: 8 }]} />
+
+      <Text style={[s.titulo, { color: C.texto, fontSize: 17 }]}>Seguridad</Text>
+      <Text style={[s.tenue, { color: C.tenue }]}>Cambia tu contraseña de acceso.</Text>
+
+      <View style={s.filaCampoPassword}>
+        <TextInput
+          style={[s.campo, { flex: 1, backgroundColor: C.fondo2, borderColor: C.borde2, color: C.texto }]}
+          placeholder="Contraseña actual"
+          placeholderTextColor={C.tenue}
+          secureTextEntry={!mostrarActual}
+          value={actual}
+          onChangeText={setActual}
+        />
+        <Pressable
+          onPress={() => setMostrarActual(!mostrarActual)}
+          style={[s.btnOjo, { borderColor: C.borde2, backgroundColor: C.fondo2 }]}
+        >
+          <Text style={{ color: C.tenue, fontSize: 12, fontWeight: '600' }}>
+            {mostrarActual ? 'Ocultar' : 'Ver'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={s.filaCampoPassword}>
+        <TextInput
+          style={[s.campo, { flex: 1, backgroundColor: C.fondo2, borderColor: C.borde2, color: C.texto }]}
+          placeholder="Nueva contraseña (mínimo 8)"
+          placeholderTextColor={C.tenue}
+          secureTextEntry={!mostrarNueva}
+          value={nueva}
+          onChangeText={setNueva}
+        />
+        <Pressable
+          onPress={() => setMostrarNueva(!mostrarNueva)}
+          style={[s.btnOjo, { borderColor: C.borde2, backgroundColor: C.fondo2 }]}
+        >
+          <Text style={{ color: C.tenue, fontSize: 12, fontWeight: '600' }}>
+            {mostrarNueva ? 'Ocultar' : 'Ver'}
+          </Text>
+        </Pressable>
+      </View>
+
+      <View style={s.filaCampoPassword}>
+        <TextInput
+          style={[s.campo, { flex: 1, backgroundColor: C.fondo2, borderColor: C.borde2, color: C.texto }]}
+          placeholder="Confirmar nueva contraseña"
+          placeholderTextColor={C.tenue}
+          secureTextEntry={!mostrarConfirmar}
+          value={confirmar}
+          onChangeText={setConfirmar}
+        />
+        <Pressable
+          onPress={() => setMostrarConfirmar(!mostrarConfirmar)}
+          style={[s.btnOjo, { borderColor: C.borde2, backgroundColor: C.fondo2 }]}
+        >
+          <Text style={{ color: C.tenue, fontSize: 12, fontWeight: '600' }}>
+            {mostrarConfirmar ? 'Ocultar' : 'Ver'}
+          </Text>
+        </Pressable>
+      </View>
+
+      {errorClave && <Text style={{ color: C.coral }}>{errorClave}</Text>}
+      {exitoClave && <Text style={{ color: C.acento }}>{exitoClave}</Text>}
+
+      <Pressable
+        onPress={guardarClave}
+        disabled={guardandoClave || !actual || !nueva || nueva.length < 8 || nueva !== confirmar}
+        style={({ pressed }) => [
+          s.boton,
+          { backgroundColor: C.fondo2, borderColor: C.borde2 },
+          (pressed || guardandoClave || !actual || !nueva || nueva.length < 8 || nueva !== confirmar) && {
+            opacity: 0.6,
+          },
+        ]}
+      >
+        {guardandoClave ? (
+          <ActivityIndicator color={C.texto} />
+        ) : (
+          <Text style={[s.botonTxt, { color: C.texto }]}>Cambiar contraseña</Text>
+        )}
+      </Pressable>
+    </View>
+  )
+}
+
 const s = StyleSheet.create({
   contenido: { padding: 16, gap: 14, paddingBottom: 36 },
   tarjeta: { borderWidth: 1, borderRadius: 18, padding: 18, gap: 10 },
@@ -217,6 +431,7 @@ const s = StyleSheet.create({
   pie: { fontSize: 11, marginTop: 4 },
   fila: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
   filaSelectorTema: { flexDirection: 'row', gap: 8, marginTop: 4 },
+  filaCampoPassword: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   separadorFila: { flexDirection: 'row', alignItems: 'center', gap: 10, marginVertical: 2 },
   lineaSeparador: { flex: 1, height: 1 },
   separadorTxt: { fontSize: 13, fontWeight: '600' },
@@ -231,6 +446,7 @@ const s = StyleSheet.create({
   },
   etiqueta: { borderWidth: 1, borderRadius: 99, paddingHorizontal: 12, paddingVertical: 8, minHeight: 44, justifyContent: 'center' },
   campo: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, minHeight: 50, fontSize: 15 },
+  btnOjo: { minHeight: 50, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12, justifyContent: 'center', alignItems: 'center' },
   boton: { minHeight: 50, borderRadius: 14, borderWidth: 1, borderColor: 'transparent', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   botonTxt: { fontWeight: '700', fontSize: 15 },
 })

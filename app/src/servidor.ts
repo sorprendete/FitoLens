@@ -90,9 +90,7 @@ export async function borrarDiagnosticoRemoto(id: number): Promise<boolean> {
   } finally {
     clearTimeout(t)
   }
-}
-
-export async function agregarDiagnosticoAParcelaRemota(
+}(
   parcelaId: number,
   diagnosticoId: number,
   severidad?: number,
@@ -115,9 +113,7 @@ export async function agregarDiagnosticoAParcelaRemota(
   } finally {
     clearTimeout(t)
   }
-}
-
-export async function quitarDiagnosticoDeParcelaRemota(
+}(
   parcelaId: number,
   diagnosticoId: number
 ): Promise<boolean> {
@@ -135,3 +131,5 @@ export async function quitarDiagnosticoDeParcelaRemota(
     clearTimeout(t)
   }
 }
+
+export { actualizarNombre, cambiarContrasena } from './cuenta'

@@ -30,6 +30,8 @@ export function SesionProvider({ children }) {
     async entrar(email, password) { const r = await iniciarSesion(email, password); setSesion({ token: r.access_token, usuario: r.usuario }) },
     async entrarConGoogle(id_token) { const r = await iniciarSesionGoogle(id_token); setSesion({ token: r.access_token, usuario: r.usuario }) },
     async registrar(nombre, email, password) { const r = await registrarse(nombre, email, password); setSesion({ token: r.access_token, usuario: r.usuario }) },
+    actualizarUsuario(u) { setSesion((s) => (s ? { ...s, usuario: { ...s.usuario, ...u } } : s)) },
+    async refrescarUsuario() { const u = await yo(); setSesion((s) => (s?.token ? { ...s, usuario: u } : s)); return u },
     comoInvitado() { setSesion({ invitado: true }) },
     salir,
   }), [sesion, salir])

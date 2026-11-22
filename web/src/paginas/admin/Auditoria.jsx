@@ -93,22 +93,24 @@ export default function Auditoria() {
 
       {error && <p className="alerta mal">{error}</p>}
       <section className="tarjeta sin-relleno">
-        <table className="tabla">
-          <thead><tr><th>Fecha</th><th>Acción</th><th>Estado</th><th>Correo</th><th>IP</th><th>Detalle</th></tr></thead>
-          <tbody>
-            {filas === null && Array.from({ length: 8 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="6"><i /></td></tr>)}
-            {filasFiltradas.map((f) => (
-              <tr key={f.id}>
-                <td data-l="Fecha">{new Date(f.fecha).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'medium' })}</td>
-                <td data-l="Acción" className="principal">{ACCIONES[f.accion] ?? f.accion}</td>
-                <td data-l="Estado"><span className={`insignia ${ESTADOS[f.estado]?.[1] ?? 'neutro'}`}>{ESTADOS[f.estado]?.[0] ?? f.estado}</span></td>
-                <td data-l="Correo">{f.email || '—'}</td>
-                <td data-l="IP"><code>{f.ip}</code></td>
-                <td data-l="Detalle" title={f.agente}>{f.detalle || '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="tabla-contenedor">
+          <table className="tabla">
+            <thead><tr><th>Fecha</th><th>Acción</th><th>Estado</th><th>Correo</th><th>IP</th><th>Detalle</th></tr></thead>
+            <tbody>
+              {filas === null && Array.from({ length: 8 }, (_, i) => <tr key={i} className="esqueleto"><td colSpan="6"><i /></td></tr>)}
+              {filasFiltradas.map((f) => (
+                <tr key={f.id}>
+                  <td data-l="Fecha">{new Date(f.fecha).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'medium' })}</td>
+                  <td data-l="Acción" className="principal">{ACCIONES[f.accion] ?? f.accion}</td>
+                  <td data-l="Estado"><span className={`insignia ${ESTADOS[f.estado]?.[1] ?? 'neutro'}`}>{ESTADOS[f.estado]?.[0] ?? f.estado}</span></td>
+                  <td data-l="Correo">{f.email || '—'}</td>
+                  <td data-l="IP"><code>{f.ip}</code></td>
+                  <td data-l="Detalle" title={f.agente}>{f.detalle || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
         {filas && !filasFiltradas.length && (
           <div style={{ textAlign: 'center', padding: '30px 16px' }}>
             <p className="tenue" style={{ marginBottom: 10 }}>Sin eventos con esos filtros.</p>

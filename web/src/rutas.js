@@ -1,4 +1,4 @@
-import { Activity, BellRing, FileSpreadsheet, BarChart3, Brain, FileClock, Grid3x3, LayoutDashboard, Map, Radar, ScanLine, Smartphone, Sprout, Users } from 'lucide-react'
+import { Activity, BellRing, FileSpreadsheet, BarChart3, Brain, FileClock, Grid3x3, LayoutDashboard, Map, Radar, ScanLine, Smartphone, Sprout, User, Users } from 'lucide-react'
 import Alertas from './paginas/admin/Alertas'
 import Amenazas from './paginas/admin/Amenazas'
 import Auditoria from './paginas/admin/Auditoria'
@@ -13,6 +13,7 @@ import Historial from './paginas/Historial'
 import Modelos from './paginas/Modelos'
 import Panel from './paginas/Panel'
 import Parcelas from './paginas/Parcelas'
+import Perfil from './paginas/Perfil'
 
 // Todas las secciones en un solo lugar. acceso: 'publico' (también invitados) | 'cuenta' | 'admin'.
 // Para agregar una sección: crear la página y añadir una línea aquí.
@@ -21,6 +22,7 @@ export const RUTAS = [
   { id: 'diagnostico', titulo: 'Diagnóstico', icono: ScanLine, C: Diagnostico, acceso: 'publico', grupo: 'Principal' },
   { id: 'historial', titulo: 'Historial', icono: FileClock, C: Historial, acceso: 'cuenta', grupo: 'Principal' },
   { id: 'parcelas', titulo: 'Mis parcelas', icono: Sprout, C: Parcelas, acceso: 'cuenta', grupo: 'Principal' },
+  { id: 'perfil', titulo: 'Mi perfil', icono: User, C: Perfil, acceso: 'cuenta', grupo: 'Principal' },
   { id: 'app-movil', titulo: 'App móvil', icono: Smartphone, C: AppMovil, acceso: 'publico', grupo: 'Principal' },
   { id: 'brotes', titulo: 'Mapa de brotes', icono: Map, C: Brotes, acceso: 'publico', grupo: 'Región San Martín' },
   { id: 'alertas-brote', titulo: 'Alertas de brote', icono: BellRing, C: Alertas, acceso: 'admin', grupo: 'Región San Martín' },

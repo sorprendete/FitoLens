@@ -1,7 +1,7 @@
 """Formas de entrada y salida de la API (las ve la web y el bot; documentadas en /api/docs)."""
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 PROVINCIAS = (
     "bellavista", "el_dorado", "huallaga", "lamas", "mariscal_caceres",
@@ -46,6 +46,34 @@ class UsuarioSalida(BaseModel):
     email: str
     nombre: str
     rol: str
+    tiene_clave: bool = True
+
+
+class PerfilActualizar(BaseModel):
+    nombre: str = Field(min_length=2, max_length=120)
+
+    @field_validator("nombre")
+    @classmethod
+    def validar_nombre(cls, v: str) -> str:
+        s = v.strip()
+        if len(s) < 2 or len(s) > 120:
+            raise ValueError("El nombre debe tener entre 2 y 120 caracteres.")
+        return s
+
+
+class CambiarClave(BaseModel):
+    actual: str | None = None
+    nueva: str
+
+    @field_validator("nueva")
+    @classmethod
+    def validar_nueva(cls, v: str) -> str:
+        b = v.encode("utf-8")
+        if len(b) < 8:
+            raise ValueError("La nueva contraseña debe tener al menos 8 caracteres.")
+        if len(b) > 72:
+            raise ValueError("La nueva contraseña no puede superar los 72 bytes.")
+        return v
 
 
 class Login(BaseModel):

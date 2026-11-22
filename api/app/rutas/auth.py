@@ -3,14 +3,14 @@ import secrets
 import jwt
 from fastapi import APIRouter, Depends, HTTPException, Request
 from jwt import PyJWKClient
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import ajustes
-from app.db.modelos import Usuario, ahora
+from app.db.modelos import Auditoria, Usuario, ahora
 from app.db.sesion import db
-from app.esquemas import Login, LoginGoogle, Registro, Token, UsuarioSalida
+from app.esquemas import CambiarClave, Login, LoginGoogle, PerfilActualizar, Registro, Token, UsuarioSalida
 from app.rutas.dependencias import usuario_requerido
 from app.seguridad import auditoria
 from app.seguridad.claves import crear_token, hashear, verificar
@@ -56,13 +56,52 @@ def verificar_token_google(id_token: str) -> dict:
     return datos
 
 
-def _token(u: Usuario) -> Token:
-    return Token(access_token=crear_token(u.id, u.rol), usuario=UsuarioSalida.model_validate(u))
+def _cuenta_tiene_clave(u: Usuario, sesion: Session | None = None) -> bool:
+    if (u.password_hash or "").startswith("!google$"):
+        return False
+    if sesion is not None and u.id is not None:
+        es_google = (
+            sesion.scalar(
+                select(func.count())
+                .select_from(Auditoria)
+                .where(
+                    Auditoria.usuario_id == u.id,
+                    Auditoria.accion == "login",
+                    Auditoria.detalle == "Google",
+                )
+            )
+            or 0
+        ) > 0
+        tiene_registro_o_cambio = (
+            sesion.scalar(
+                select(func.count())
+                .select_from(Auditoria)
+                .where(
+                    Auditoria.usuario_id == u.id,
+                    Auditoria.accion.in_(("registro", "cambio_clave")),
+                )
+            )
+            or 0
+        ) > 0
+        if es_google and not tiene_registro_o_cambio:
+            return False
+    return True
+
+
+def _token(u: Usuario, sesion: Session | None = None) -> Token:
+    salida = UsuarioSalida(
+        id=u.id,
+        email=u.email,
+        nombre=u.nombre,
+        rol=u.rol,
+        tiene_clave=_cuenta_tiene_clave(u, sesion),
+    )
+    return Token(access_token=crear_token(u.id, u.rol), usuario=salida)
 
 
 @router.post("/login", response_model=Token)
 def login(datos: Login, request: Request, sesion: Session = Depends(db)):
-    return _token(autenticar(datos, request, sesion))
+    return _token(autenticar(datos, request, sesion), sesion)
 
 
 @router.post("/google", response_model=Token)
@@ -98,7 +137,7 @@ def login_google(datos: LoginGoogle, request: Request, sesion: Session = Depends
         u = Usuario(
             email=email,
             nombre=nombre,
-            password_hash=hashear(secrets.token_urlsafe(32)),
+            password_hash="!google$" + hashear(secrets.token_urlsafe(32)),
             ultimo_acceso=ahora(),
         )
         sesion.add(u)
@@ -113,7 +152,7 @@ def login_google(datos: LoginGoogle, request: Request, sesion: Session = Depends
         sesion.commit()
 
     auditoria.registrar(sesion, request, "login", "exito", usuario_id=u.id, email=email, detalle="Google")
-    return _token(u)
+    return _token(u, sesion)
 
 
 def autenticar(datos: Login, request: Request, sesion: Session, detalle: str | None = None) -> Usuario:
@@ -156,12 +195,80 @@ def registro(datos: Registro, request: Request, sesion: Session = Depends(db)):
     sesion.add(u)
     sesion.flush()
     auditoria.registrar(sesion, request, "registro", "exito", usuario_id=u.id, email=email)
-    return _token(u)
+    return _token(u, sesion)
 
 
 @router.get("/yo", response_model=UsuarioSalida)
-def yo(usuario: Usuario = Depends(usuario_requerido)):
-    return usuario
+def yo(usuario: Usuario = Depends(usuario_requerido), sesion: Session = Depends(db)):
+    return UsuarioSalida(
+        id=usuario.id,
+        email=usuario.email,
+        nombre=usuario.nombre,
+        rol=usuario.rol,
+        tiene_clave=_cuenta_tiene_clave(usuario, sesion),
+    )
+
+
+@router.patch("/yo", response_model=UsuarioSalida)
+def actualizar_perfil(
+    datos: PerfilActualizar,
+    request: Request,
+    usuario: Usuario = Depends(usuario_requerido),
+    sesion: Session = Depends(db),
+):
+    usuario.nombre = datos.nombre
+    sesion.commit()
+    sesion.refresh(usuario)
+    auditoria.registrar(
+        sesion, request, "perfil", "exito",
+        usuario_id=usuario.id, email=usuario.email, detalle="Nombre actualizado",
+    )
+    return UsuarioSalida(
+        id=usuario.id,
+        email=usuario.email,
+        nombre=usuario.nombre,
+        rol=usuario.rol,
+        tiene_clave=_cuenta_tiene_clave(usuario, sesion),
+    )
+
+
+@router.post("/cambiar-clave")
+def cambiar_clave(
+    datos: CambiarClave,
+    request: Request,
+    usuario: Usuario = Depends(usuario_requerido),
+    sesion: Session = Depends(db),
+):
+    ip = auditoria.ip_cliente(request)
+    if esta_bloqueado(sesion, usuario.email, ip):
+        auditoria.registrar(
+            sesion, request, "cambio_clave", "bloqueado",
+            usuario_id=usuario.id, email=usuario.email,
+            detalle="Demasiados intentos fallidos.",
+        )
+        minutos = ajustes().login_bloqueo_minutos
+        raise HTTPException(429, f"Demasiados intentos fallidos. Espera {minutos} minutos.")
+
+    tiene_clave = _cuenta_tiene_clave(usuario, sesion)
+    if tiene_clave:
+        actual = (datos.actual or "").strip()
+        if not actual:
+            raise HTTPException(400, "Debes ingresar tu contraseña actual.")
+        if not verificar(actual, usuario.password_hash):
+            auditoria.registrar(
+                sesion, request, "cambio_clave", "fallo",
+                usuario_id=usuario.id, email=usuario.email,
+                detalle="Contraseña actual incorrecta.",
+            )
+            raise HTTPException(400, "La contraseña actual no es correcta.")
+
+    usuario.password_hash = hashear(datos.nueva)
+    sesion.commit()
+    auditoria.registrar(
+        sesion, request, "cambio_clave", "exito",
+        usuario_id=usuario.id, email=usuario.email,
+    )
+    return {"ok": True, "mensaje": "Contraseña actualizada correctamente."}
 
 
 def asegurar_admin(sesion: Session) -> None:

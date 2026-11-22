@@ -253,34 +253,36 @@ function Detalle({ id, onVolver }) {
 
       <div className="rejilla-2 ancha-izq">
         <section className="tarjeta sin-relleno">
-          <table className="tabla">
-            <thead><tr><th>Fecha</th><th>Severidad</th><th>Diagnóstico IA</th><th>Tratamiento / nota</th><th>Acciones</th></tr></thead>
-            <tbody>
-              {[...p.historial].reverse().map((v) => (
-                <tr key={v.id}>
-                  <td data-l="Fecha">{fecha(v.fecha)}</td>
-                  <td data-l="Severidad"><Severidad v={v.severidad} /></td>
-                  <td data-l="Diagnóstico IA">{v.clase ? `${infoClase(v.clase).nombre} (${pct(v.confianza)})` : v.estado === 'no_concluyente' ? 'No concluyente' : '—'}</td>
-                  <td data-l="Tratamiento / nota">{v.tratamiento && <b className="bloque-txt">{v.tratamiento}</b>}{v.nota && <span className="tenue">{v.nota}</span>}{!v.tratamiento && !v.nota && '—'}</td>
-                  <td data-l="Acciones">
-                    <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                      {v.diagnostico_id && (
-                        <button
-                          type="button"
-                          className="btn sec chico"
-                          onClick={() => quitarDiag(v.diagnostico_id)}
-                          title="Quitar de la parcela"
-                        >
-                          Quitar
-                        </button>
-                      )}
-                      <button className="icono-btn" onClick={() => borrarVisita(v)} aria-label="Borrar visita" title="Borrar visita"><Trash2 size={16} /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="tabla-contenedor">
+            <table className="tabla">
+              <thead><tr><th>Fecha</th><th>Severidad</th><th>Diagnóstico IA</th><th>Tratamiento / nota</th><th>Acciones</th></tr></thead>
+              <tbody>
+                {[...p.historial].reverse().map((v) => (
+                  <tr key={v.id}>
+                    <td data-l="Fecha">{fecha(v.fecha)}</td>
+                    <td data-l="Severidad"><Severidad v={v.severidad} /></td>
+                    <td data-l="Diagnóstico IA">{v.clase ? `${infoClase(v.clase).nombre} (${pct(v.confianza)})` : v.estado === 'no_concluyente' ? 'No concluyente' : '—'}</td>
+                    <td data-l="Tratamiento / nota">{v.tratamiento && <b className="bloque-txt">{v.tratamiento}</b>}{v.nota && <span className="tenue">{v.nota}</span>}{!v.tratamiento && !v.nota && '—'}</td>
+                    <td data-l="Acciones">
+                      <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                        {v.diagnostico_id && (
+                          <button
+                            type="button"
+                            className="btn sec chico"
+                            onClick={() => quitarDiag(v.diagnostico_id)}
+                            title="Quitar de la parcela"
+                          >
+                            Quitar
+                          </button>
+                        )}
+                        <button className="icono-btn" onClick={() => borrarVisita(v)} aria-label="Borrar visita" title="Borrar visita"><Trash2 size={16} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           {!p.historial.length && <p className="tenue centro relleno">Sin visitas todavía.</p>}
         </section>
         <FormVisita parcela={p} onListo={cargar} />

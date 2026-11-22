@@ -14,7 +14,7 @@ from app.db.modelos import Auditoria
 def _fallos(sesion: Session, condicion, desde: datetime) -> int:
     return sesion.scalar(
         select(func.count()).select_from(Auditoria).where(
-            Auditoria.accion == "login", Auditoria.estado == "fallo", Auditoria.fecha >= desde, condicion)
+            Auditoria.accion.in_(("login", "cambio_clave")), Auditoria.estado == "fallo", Auditoria.fecha >= desde, condicion)
     )
 
 

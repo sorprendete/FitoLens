@@ -65,20 +65,22 @@ export default function Alertas() {
         <header className="tarjeta-cab relleno"><h3>Quiénes reciben las alertas</h3><span className="tenue">{subs?.length ?? 0} suscripciones</span></header>
         {subs?.length === 0 && <div className="vacio"><BellRing /><h3>Nadie suscrito todavía</h3><p>Pide a los técnicos que escriban /alertas al bot de FitoLens.</p></div>}
         {!!subs?.length && (
-          <table className="tabla">
-            <thead><tr><th>Nombre</th><th>Chat de Telegram</th><th>Provincia</th><th>Desde</th><th /></tr></thead>
-            <tbody>
-              {subs.map((s) => (
-                <tr key={s.id}>
-                  <td data-l="Nombre" className="principal"><b>{s.nombre || 'Sin nombre'}</b></td>
-                  <td data-l="Chat"><code>{s.chat_id}</code></td>
-                  <td data-l="Provincia"><span className="insignia neutro"><MapPin size={12} />{s.provincia_nombre}</span></td>
-                  <td data-l="Desde">{new Date(s.creado).toLocaleDateString('es-PE', { dateStyle: 'medium' })}</td>
-                  <td><button className="btn chico peligro" onClick={() => borrar(s)} aria-label="Quitar"><Trash2 size={14} />Quitar</button></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="tabla-contenedor">
+            <table className="tabla">
+              <thead><tr><th>Nombre</th><th>Chat de Telegram</th><th>Provincia</th><th>Desde</th><th /></tr></thead>
+              <tbody>
+                {subs.map((s) => (
+                  <tr key={s.id}>
+                    <td data-l="Nombre" className="principal"><b>{s.nombre || 'Sin nombre'}</b></td>
+                    <td data-l="Chat"><code>{s.chat_id}</code></td>
+                    <td data-l="Provincia"><span className="insignia neutro"><MapPin size={12} />{s.provincia_nombre}</span></td>
+                    <td data-l="Desde">{new Date(s.creado).toLocaleDateString('es-PE', { dateStyle: 'medium' })}</td>
+                    <td><button className="btn chico peligro" onClick={() => borrar(s)} aria-label="Quitar"><Trash2 size={14} />Quitar</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>

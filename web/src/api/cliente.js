@@ -99,6 +99,14 @@ export const iniciarSesionGoogle = (id_token) =>
 export const registrarse = (nombre, email, password) =>
   privado(() => pedir('/auth/registro', { metodo: 'POST', json: { nombre, email, password } }), () => mocks.login(email, nombre))
 export const yo = () => privado(() => pedir('/auth/yo'), mocks.yo)
+export const actualizarPerfil = (nombre) =>
+  privado(() => pedir('/auth/yo', { metodo: 'PATCH', json: { nombre } }), async () => {
+    const u = await mocks.yo()
+    u.nombre = nombre
+    return u
+  })
+export const cambiarClave = (actual, nueva) =>
+  privado(() => pedir('/auth/cambiar-clave', { metodo: 'POST', json: { actual, nueva } }), async () => ({ ok: true, mensaje: 'Contraseña actualizada.' }))
 export function obtenerHistorial(limite = 200, opciones = {}) {
   let sin_parcela = false
   if (typeof limite === 'object' && limite !== null) {

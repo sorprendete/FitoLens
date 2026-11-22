@@ -87,6 +87,58 @@ export async function iniciarSesionGoogle(idToken: string) {
 }
 
 // Desvincula el teléfono. Los diagnósticos ya subidos se quedan en la web; los pendientes se quedan en el teléfono.
+export async function actualizarNombre(nombre: string) {
+  const t = tokenActual()
+  if (!t) throw new Error('No hay sesión iniciada.')
+  const res = await fetch(`${API}/api/auth/yo`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+    body: JSON.stringify({ nombre: nombre.trim() }),
+  })
+  const d = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(
+      typeof d?.detail === 'string'
+        ? d.detail
+        : res.status === 422
+        ? 'El nombre debe tener entre 2 y 120 caracteres.'
+        : `Error ${res.status}`
+    )
+  }
+  if (cuenta) {
+    cuenta = { ...cuenta, nombre: d.nombre }
+    await SecureStore.setItemAsync(
+      K_CUENTA,
+      JSON.stringify({ nombre: d.nombre, email: cuenta.email, dispositivo: cuenta.dispositivo })
+    )
+    avisar()
+  }
+  return d
+}
+
+export async function cambiarContrasena(actual: string, nueva: string) {
+  const t = tokenActual()
+  if (!t) throw new Error('No hay sesión iniciada.')
+  const res = await fetch(`${API}/api/auth/cambiar-clave`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${t}` },
+    body: JSON.stringify({ actual, nueva }),
+  })
+  const d = await res.json().catch(() => null)
+  if (!res.ok) {
+    throw new Error(
+      typeof d?.detail === 'string'
+        ? d.detail
+        : res.status === 400
+        ? d?.detail || 'La contraseña actual no es correcta.'
+        : res.status === 429
+        ? 'Demasiados intentos fallidos. Espera unos minutos.'
+        : `Error ${res.status}`
+    )
+  }
+  return d
+}
+
 export async function cerrarSesion() {
   try {
     await GoogleSignin.signOut()
