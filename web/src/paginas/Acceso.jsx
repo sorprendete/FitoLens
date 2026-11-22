@@ -54,7 +54,9 @@ export default function Acceso({ modo }) {
         window.google.accounts.id.renderButton(googleBtnRef.current, {
           theme: tema === 'oscuro' ? 'filled_black' : 'outline',
           size: 'large',
-          width: 320,
+          // Mismo ancho que el botón Ingresar (Google admite hasta 400 px)
+          width: Math.max(200, Math.min(400, googleBtnRef.current.parentElement?.clientWidth || 320)),
+          shape: 'rectangular',
           text: registro ? 'signup_with' : 'signin_with',
           locale: 'es',
         })
@@ -187,10 +189,10 @@ export default function Acceso({ modo }) {
             {enviando ? <span className="girando" /> : registro ? <UserPlus size={19} /> : <LogIn size={19} />}
             {registro ? 'Crear cuenta' : 'Ingresar'}
           </button>
-          {googleListo && <div className="separador"><span>o</span></div>}
-          {/* El contenedor existe siempre: Google necesita dibujar el botón dentro antes de mostrarlo. */}
-          <div ref={googleBtnRef} style={{ display: googleListo ? 'flex' : 'none', justifyContent: 'center', minHeight: 44 }} />
           <div className="separador"><span>o</span></div>
+          {/* El contenedor existe siempre: Google necesita dibujar el botón dentro antes de mostrarlo.
+              color-scheme light evita el recuadro blanco del iframe de Google en modo oscuro. */}
+          <div ref={googleBtnRef} style={{ display: googleListo ? 'flex' : 'none', justifyContent: 'center', minHeight: 44, colorScheme: 'light', marginBottom: 10 }} />
           <button type="button" className="btn sec ancho" onClick={() => { s.comoInvitado(); location.hash = 'diagnostico' }}>
             Probar sin cuenta<ArrowRight size={18} />
           </button>
