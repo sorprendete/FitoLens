@@ -2,6 +2,7 @@
 // En paralelo, U2-Net-p ubica la hoja (solo para dibujar el contorno y recortar el mapa de calor: no cambia el diagnóstico).
 import { Asset } from 'expo-asset'
 import { manifest, obtenerFuenteModelo, estaModeloInstalado } from './modelos'
+import { nombreVisibleGrupo, registrarLimpiadorSesion } from './gestorModelos'
 import { aTensor } from './imagen'
 import { ATENCION_MIN_DENTRO, LADO, Punto, Segmentacion, analizar, aptaPara, fraccionDentro, huecosMordedura, mapaCalor } from './vision'
 
@@ -47,6 +48,10 @@ export function limpiarSesion(nombre?: string) {
   if (nombre) delete sesiones[nombre]
   else Object.keys(sesiones).forEach((k) => delete sesiones[k])
 }
+
+try {
+  registrarLimpiadorSesion(limpiarSesion)
+} catch {}
 
 async function sesion(nombre: string) {
   if (!sesiones[nombre]) {
@@ -136,8 +141,8 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado & { visi
   if (!disponible) {
     r.estado = 'no_concluyente'
     r.faltaModelo = nombre
-    r.motivo = `Reconocimos que la planta es ${NOMBRES_CULTIVO[cultivo] ?? cultivo}. El modelo especialista (${nombre}) no está descargado aún.`
-    paso('especialista', `Modelo de ${NOMBRES_CULTIVO[cultivo] ?? cultivo}`, `Pendiente de descarga (${nombre})`, reloj())
+    r.motivo = `Reconocimos que la planta es ${NOMBRES_CULTIVO[cultivo] ?? cultivo}. El modelo especialista de ${nombreVisibleGrupo(nombre)} no está descargado aún.`
+    paso('especialista', `Modelo de ${NOMBRES_CULTIVO[cultivo] ?? cultivo}`, `Pendiente de descarga: ${nombreVisibleGrupo(nombre)}`, reloj())
     return fin()
   }
 

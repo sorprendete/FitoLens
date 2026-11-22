@@ -18,16 +18,16 @@ export const archivo = (n: string): number | null => {
 }
 
 /**
- * Busca primero si el modelo viaja dentro del APK (asset require),
- * y si no, busca el archivo descargado en documentDirectory/modelos/.
+ * Busca primero si el archivo descargado o actualizado existe en documentDirectory/modelos/,
+ * y si no, busca el recurso que viaja dentro del APK (asset require).
  */
 export async function obtenerFuenteModelo(n: string): Promise<FuenteModelo | null> {
-  if (MODELOS_INCLUIDOS[n]) {
-    return { tipo: 'asset', recurso: MODELOS_INCLUIDOS[n] }
-  }
   const ruta = await rutaLocalDescargada(n)
   if (ruta) {
     return { tipo: 'archivo', ruta }
+  }
+  if (MODELOS_INCLUIDOS[n]) {
+    return { tipo: 'asset', recurso: MODELOS_INCLUIDOS[n] }
   }
   return null
 }

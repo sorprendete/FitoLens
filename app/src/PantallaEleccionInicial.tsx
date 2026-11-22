@@ -8,6 +8,8 @@ import {
   GrupoModeloId,
   descargarGrupo,
   marcarSetupInicialCompletado,
+  nombreVisibleGrupo,
+  plantasDeGrupo,
 } from './gestorModelos'
 import { Novedad, verificarParaDescargarModelos } from './actualizacion'
 import TarjetaActualizacion from './TarjetaActualizacion'
@@ -130,9 +132,9 @@ export default function PantallaEleccionInicial({
                         {marcado && <Text style={{ color: C.textoBotonAcento, fontWeight: '800', fontSize: 13 }}>✓</Text>}
                       </View>
                       <View style={{ flex: 1, gap: 2 }}>
-                        <Text style={[s.opcionTitulo, { color: C.texto }]}>{g.nombre}</Text>
+                        <Text style={[s.opcionTitulo, { color: C.texto }]}>{nombreVisibleGrupo(g.id)}</Text>
                         <Text style={[s.opcionDetalle, { color: C.tenue }]}>
-                          {g.cultivos.join(', ')}
+                          {plantasDeGrupo(g.id).join(', ')}
                         </Text>
                       </View>
                       <Text style={[s.tamano, { color: C.tenue }]}>{g.tamano_mb} MB</Text>

@@ -8,7 +8,7 @@ import Voz from './Voz'
 import BotonReporte from './BotonReporte'
 import { CULTIVOS, URGENCIA, esSana, infoClase } from './catalogo'
 import type { Resultado, Vision } from './ia'
-import { GRUPOS_MODELO, descargarGrupo, estaGrupoDisponible, escucharProgreso } from './gestorModelos'
+import { GRUPOS_MODELO, descargarGrupo, estaGrupoDisponible, escucharProgreso, nombreVisibleGrupo } from './gestorModelos'
 import { Novedad, verificarParaDescargarModelos } from './actualizacion'
 import TarjetaActualizacion from './TarjetaActualizacion'
 import { enLinea, enviar } from './servidor'
@@ -222,7 +222,7 @@ export function TarjetaResultado({
         <Text style={[s.sobre, { color: C.oro }]}>CULTIVO RECONOCIDO</Text>
         <Text style={[s.nombre, { color: C.texto }]}>{cultivo ? cultivo.nombre : r.cultivo}</Text>
         <Text style={[s.consejoTxt, { color: C.texto }]}>
-          Reconocimos que la foto es de {cultivo?.nombre ?? r.cultivo}. Para emitir el diagnóstico de enfermedades sin internet, necesitas el modelo especialista de {grupoFaltante.nombre}.
+          Reconocimos que la foto es de {cultivo?.nombre ?? r.cultivo}. Para emitir el diagnóstico de enfermedades sin internet, necesitas el modelo especialista de {nombreVisibleGrupo(r.faltaModelo)}.
         </Text>
 
         {/* Alerta si requiere actualizar la app antes de agregar este cultivo */}
@@ -256,7 +256,7 @@ export function TarjetaResultado({
             style={({ pressed }) => [s.otra, { backgroundColor: C.acento }, brillo(C.acento), pressed && { opacity: 0.8 }]}
           >
             <Text style={[s.otraTxt, { color: C.textoBotonAcento }]}>
-              ⬇  Descargar modelo de {grupoFaltante.nombre.split(' ')[0]} ({grupoFaltante.tamano_mb} MB)
+              ⬇  Descargar modelo de {nombreVisibleGrupo(r.faltaModelo)} ({grupoFaltante.tamano_mb} MB)
             </Text>
           </Pressable>
         ) : null}

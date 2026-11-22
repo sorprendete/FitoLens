@@ -8,6 +8,7 @@ import {
   alCambiarModelos,
   borrarModeloDescargado,
   descargarGrupo,
+  actualizarModelo,
   escucharProgreso,
   estaGrupoDisponible,
   estaIncluidoEnApk,
@@ -15,6 +16,10 @@ import {
   pausarDescarga,
   reanudarDescarga,
   cancelarDescarga,
+  nombreVisibleGrupo,
+  plantasDeGrupo,
+  useActualizacionesModelos,
+  ActualizacionModelo,
 } from './gestorModelos'
 import { Novedad, verificarParaDescargarModelos } from './actualizacion'
 import TarjetaActualizacion from './TarjetaActualizacion'
@@ -24,6 +29,13 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
   const [disponibles, setDisponibles] = useState<Record<string, boolean>>({})
   const [avisoActualizar, setAvisoActualizar] = useState<Novedad | null>(null)
   const [mensajeSinInternet, setMensajeSinInternet] = useState<string | null>(null)
+  const [actualizandoTodos, setActualizandoTodos] = useState(false)
+
+  const {
+    actualizaciones,
+    refrescarActualizaciones,
+    tieneActualizacion,
+  } = useActualizacionesModelos()
 
   const cargar = useCallback(async () => {
     const mapa: Record<string, boolean> = {}
@@ -56,6 +68,25 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
     return true
   }
 
+  const actualizarTodos = async () => {
+    const puede = await validarDescarga()
+    if (!puede) return
+    setActualizandoTodos(true)
+    try {
+      for (const act of actualizaciones) {
+        try {
+          await actualizarModelo(act.grupoId, act)
+        } catch (e: any) {
+          Alert.alert('Error al actualizar', e?.message ?? `No se pudo actualizar ${act.nombreVisible}`)
+        }
+      }
+      await cargar()
+      await refrescarActualizaciones()
+    } catch {} finally {
+      setActualizandoTodos(false)
+    }
+  }
+
   return (
     <View style={s.contenedor}>
       <Text style={[s.sobre, { color: C.acento }]}>MODELOS DE DIAGNÓSTICO OFFLINE</Text>
@@ -84,6 +115,31 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
         </View>
       )}
 
+      {/* Aviso de Actualizar todos si hay múltiples cultivos con actualización */}
+      {actualizaciones.length > 1 && (
+        <View style={[s.tarjetaActualizarTodos, { backgroundColor: C.fondo2, borderColor: C.oro }]}>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Text style={[s.sobre, { color: C.oro }]}>MEJORAS DISPONIBLES</Text>
+            <Text style={[s.tituloActualizarTodos, { color: C.texto }]}>
+              {actualizaciones.length} cultivos tienen nueva versión
+            </Text>
+          </View>
+          <Pressable
+            onPress={actualizarTodos}
+            disabled={actualizandoTodos}
+            style={({ pressed }) => [
+              s.botonActualizarTodos,
+              { backgroundColor: C.oro },
+              (pressed || actualizandoTodos) && { opacity: 0.75 },
+            ]}
+          >
+            <Text style={[s.botonActualizarTodosTxt, { color: '#000000' }]}>
+              {actualizandoTodos ? 'Actualizando…' : 'Actualizar todos'}
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       <View style={{ gap: 10, marginTop: 4 }}>
         {GRUPOS_MODELO.map((g) => (
           <FilaGrupo
@@ -91,6 +147,7 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
             grupo={g}
             instalado={!!disponibles[g.id]}
             incluidoEnApk={estaIncluidoEnApk(g.id)}
+            actualizacion={tieneActualizacion(g.id)}
             validarAntesDeDescargar={validarDescarga}
             onRefrescar={cargar}
           />
@@ -104,12 +161,14 @@ function FilaGrupo({
   grupo,
   instalado,
   incluidoEnApk,
+  actualizacion,
   validarAntesDeDescargar,
   onRefrescar,
 }: {
   grupo: InfoGrupoCultivo
   instalado: boolean
   incluidoEnApk: boolean
+  actualizacion: ActualizacionModelo | null
   validarAntesDeDescargar: () => Promise<boolean>
   onRefrescar: () => void
 }) {
@@ -136,6 +195,18 @@ function FilaGrupo({
     }
   }
 
+  const actualizar = async () => {
+    const puede = await validarAntesDeDescargar()
+    if (!puede) return
+
+    try {
+      await actualizarModelo(grupo.id, actualizacion ?? undefined)
+      onRefrescar()
+    } catch (e: any) {
+      Alert.alert('Error al actualizar', e?.message ?? `No se pudo actualizar ${nombreVisibleGrupo(grupo.id)}.`)
+    }
+  }
+
   const reanudar = async () => {
     const puede = await validarAntesDeDescargar()
     if (!puede) return
@@ -145,7 +216,7 @@ function FilaGrupo({
   const borrar = () => {
     Alert.alert(
       'Borrar modelo',
-      `¿Deseas borrar el modelo de ${grupo.nombre} (${grupo.tamano_mb} MB) para liberar espacio?`,
+      `¿Deseas borrar el modelo de ${nombreVisibleGrupo(grupo.id)} (${grupo.tamano_mb} MB) para liberar espacio?`,
       [
         { text: 'Cancelar', style: 'cancel' },
         {
@@ -163,16 +234,40 @@ function FilaGrupo({
   const enDescarga = estado.estado === 'descargando' || estado.estado === 'pausada'
 
   return (
-    <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }]}>
+    <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: actualizacion ? C.oro : C.borde }]}>
       <View style={s.cabecera}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text style={[s.nombre, { color: C.texto }]}>{grupo.nombre}</Text>
+          <Text style={[s.nombre, { color: C.texto }]}>{nombreVisibleGrupo(grupo.id)}</Text>
           <Text style={[s.detalles, { color: C.tenue }]}>
-            {grupo.cultivos.join(', ')} · {grupo.tamano_mb} MB
+            {plantasDeGrupo(grupo.id).join(', ')} · {actualizacion ? `${actualizacion.tamano_mb} MB` : `${grupo.tamano_mb} MB`}
           </Text>
         </View>
 
-        {incluidoEnApk ? (
+        {actualizacion && !enDescarga ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Pressable
+              onPress={actualizar}
+              style={({ pressed }) => [
+                s.botonActualizarCultivo,
+                { backgroundColor: C.oro },
+                pressed && { opacity: 0.75 },
+              ]}
+            >
+              <Text style={[s.botonActualizarCultivoTxt, { color: '#000000' }]}>
+                Actualizar · {actualizacion.tamano_mb} MB
+              </Text>
+            </Pressable>
+            {instalado && !incluidoEnApk && (
+              <Pressable
+                onPress={borrar}
+                hitSlop={8}
+                style={({ pressed }) => [s.botonBorrar, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={{ color: C.coral, fontSize: 12, fontWeight: '700' }}>Borrar</Text>
+              </Pressable>
+            )}
+          </View>
+        ) : incluidoEnApk && !enDescarga ? (
           <View style={[s.chip, { borderColor: C.sana + '66', backgroundColor: C.sana + '18' }]}>
             <Text style={{ color: C.sana, fontSize: 12, fontWeight: '700' }}>Incluido en app</Text>
           </View>
@@ -203,12 +298,26 @@ function FilaGrupo({
         ) : null}
       </View>
 
+      {/* Aviso de nueva versión del modelo */}
+      {actualizacion && !enDescarga && (
+        <View style={s.filaNuevaVersion}>
+          <Text style={{ fontSize: 12 }}>✨</Text>
+          <Text style={[s.textoNuevaVersion, { color: C.oro }]}>
+            Nueva versión del modelo
+          </Text>
+        </View>
+      )}
+
       {/* Progreso de descarga activa */}
       {enDescarga && (
         <View style={{ marginTop: 8, gap: 6 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={[s.detalles, { color: C.acento, fontWeight: '700' }]}>
-              {estado.estado === 'pausada' ? 'Descarga en pausa' : 'Descargando modelo…'}{' '}
+            <Text style={[s.detalles, { color: actualizacion ? C.oro : C.acento, fontWeight: '700' }]}>
+              {estado.estado === 'pausada'
+                ? 'Descarga en pausa'
+                : actualizacion
+                ? 'Actualizando modelo…'
+                : 'Descargando modelo…'}{' '}
               {Math.round(estado.progreso * 100)} %
             </Text>
             <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -232,7 +341,7 @@ function FilaGrupo({
                 s.barra,
                 {
                   width: `${Math.round(estado.progreso * 100)}%`,
-                  backgroundColor: estado.estado === 'pausada' ? C.oro : C.acento,
+                  backgroundColor: estado.estado === 'pausada' ? C.oro : actualizacion ? C.oro : C.acento,
                 },
               ]}
             />
@@ -324,6 +433,55 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 6,
+  },
+  tarjetaActualizarTodos: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginVertical: 4,
+  },
+  tituloActualizarTodos: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  botonActualizarTodos: {
+    borderRadius: 10,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botonActualizarTodosTxt: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botonActualizarCultivo: {
+    borderRadius: 10,
+    minHeight: 40,
+    paddingHorizontal: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  botonActualizarCultivoTxt: {
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  filaNuevaVersion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 6,
+    paddingTop: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e0a80044',
+  },
+  textoNuevaVersion: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   pista: {
     height: 6,

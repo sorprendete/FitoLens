@@ -6,7 +6,7 @@ import { Fila, listar } from './historial'
 import { cuentaActual } from './cuenta'
 import { Parcela, Visita, listarParcelas, visitas, SEVERIDAD } from './parcelas'
 import { CULTIVOS, esSana, infoClase } from './catalogo'
-import { GRUPOS_MODELO, useCultivosInstalados } from './gestorModelos'
+import { GRUPOS_MODELO, plantasDeGrupo, useCultivosInstalados, useActualizacionesModelos } from './gestorModelos'
 
 export default function Inicio({
   onDiagnosticar,
@@ -31,6 +31,7 @@ export default function Inicio({
     totalGrupos,
     esGrupoInstalado,
   } = useCultivosInstalados()
+  const { actualizaciones } = useActualizacionesModelos()
 
   const cargarDatos = useCallback(() => {
     try {
@@ -129,6 +130,33 @@ export default function Inicio({
         <Text style={{ color: C.acento, fontSize: 24, fontWeight: '700' }}>›</Text>
       </Pressable>
 
+      {/* Aviso pequeño de mejoras para cultivos */}
+      {actualizaciones.length > 0 && (
+        <Pressable
+          onPress={onGestionarCultivos}
+          style={({ pressed }) => [
+            s.avisoMejoras,
+            { backgroundColor: C.oro + '18', borderColor: C.oro + '66' },
+            pressed && { opacity: 0.75 },
+          ]}
+        >
+          <View style={s.avisoMejorasFila}>
+            <Text style={{ fontSize: 16 }}>✨</Text>
+            <View style={{ flex: 1, gap: 1 }}>
+              <Text style={[s.avisoMejorasTitulo, { color: C.texto }]}>
+                Hay mejoras para tus cultivos
+              </Text>
+              <Text style={[s.avisoMejorasSub, { color: C.tenue }]}>
+                {actualizaciones.length === 1
+                  ? `Nueva versión del modelo disponible para ${actualizaciones[0].nombreVisible}.`
+                  : `Nuevas versiones disponibles para ${actualizaciones.length} cultivos.`}
+              </Text>
+            </View>
+            <Text style={{ color: C.oro, fontWeight: '700', fontSize: 13 }}>Mis cultivos ›</Text>
+          </View>
+        </Pressable>
+      )}
+
       {/* 3. Cultivos instalados vs disponibles */}
       <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }]}>
         <View style={s.tarjetaCabecera}>
@@ -148,32 +176,36 @@ export default function Inicio({
         </Text>
 
         <View style={s.chipsFila}>
-          {GRUPOS_MODELO.map((g) => {
+          {GRUPOS_MODELO.flatMap((g) => {
             const instalado = esGrupoInstalado(g.id)
-            return (
-              <View
-                key={g.id}
-                style={[
-                  s.chip,
-                  {
-                    borderColor: instalado ? C.sana : C.borde2,
-                    backgroundColor: instalado ? C.sana + '18' : C.fondo2,
-                  },
-                ]}
+            return plantasDeGrupo(g.id).map((planta) => ({
+              key: `${g.id}_${planta}`,
+              nombre: planta,
+              instalado,
+            }))
+          }).map((item) => (
+            <View
+              key={item.key}
+              style={[
+                s.chip,
+                {
+                  borderColor: item.instalado ? C.sana : C.borde2,
+                  backgroundColor: item.instalado ? C.sana + '18' : C.fondo2,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: item.instalado ? C.sana : C.tenue,
+                  fontSize: 12,
+                  fontWeight: '700',
+                }}
               >
-                <Text
-                  style={{
-                    color: instalado ? C.sana : C.tenue,
-                    fontSize: 12,
-                    fontWeight: '700',
-                  }}
-                >
-                  {instalado ? '✓ ' : '○ '}
-                  {g.nombre.split(' ')[0]}
-                </Text>
-              </View>
-            )
-          })}
+                {item.instalado ? '✓ ' : '○ '}
+                {item.nombre}
+              </Text>
+            </View>
+          ))}
         </View>
 
         {gruposDisponibles.length > 0 && (
@@ -445,5 +477,23 @@ const s = StyleSheet.create({
   alertaTxt: {
     fontSize: 12,
     lineHeight: 17,
+  },
+  avisoMejoras: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 12,
+    marginVertical: 4,
+  },
+  avisoMejorasFila: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  avisoMejorasTitulo: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  avisoMejorasSub: {
+    fontSize: 12,
   },
 })

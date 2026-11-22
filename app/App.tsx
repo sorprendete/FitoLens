@@ -17,7 +17,7 @@ import Cuenta from './src/Cuenta'
 import AvisoActualizacion from './src/AvisoActualizacion'
 import QueDetecta from './src/QueDetecta'
 import { cargarCuenta, cuentaActual, provinciaActual } from './src/cuenta'
-import { esVarianteLiviana, haCompletadoSetupInicial, useCultivosInstalados } from './src/gestorModelos'
+import { esVarianteLiviana, haCompletadoSetupInicial, nombreVisibleGrupo, useCultivosInstalados } from './src/gestorModelos'
 import PantallaEleccionInicial from './src/PantallaEleccionInicial'
 
 type Vista = 'inicio' | 'diagnosticar' | 'historial' | 'parcelas' | 'cuenta'
@@ -285,6 +285,12 @@ function Historial() {
   const [fechaSel, setFechaSel] = useState<'todo' | 'hoy' | '7dias' | '30dias'>('todo')
   const [ordenReciente, setOrdenReciente] = useState(true)
 
+  useEffect(() => {
+    if (cultivoSel !== 'todos' && !cultivosInstalados.includes(cultivoSel)) {
+      setCultivoSel('todos')
+    }
+  }, [cultivosInstalados, cultivoSel])
+
   const cargar = useCallback(() => {
     try {
       setFilas(listar())
@@ -419,7 +425,10 @@ function Historial() {
 
     const resultado = filas.filter((f) => {
       // 1. Cultivo instalado o seleccionado
-      if (cultivoSel !== 'todos' && f.cultivo !== cultivoSel) return false
+      if (cultivoSel !== 'todos') {
+        const coincideCultivo = f.cultivo === cultivoSel || (f.clase && f.clase.startsWith(cultivoSel + '_'))
+        if (!coincideCultivo) return false
+      }
 
       // 2. Estado (Enferma / Sana / No concluyente)
       if (estadoSel !== 'todos') {
@@ -454,7 +463,7 @@ function Historial() {
       // 5. Búsqueda por texto (enfermedad, cultivo, provincia, notas)
       if (qNorm) {
         const enf = f.clase ? infoClase(f.clase, f.etiqueta).nombre.toLowerCase() : (f.estado === 'rechazada' ? 'foto no válida' : 'no concluyente')
-        const cult = (CULTIVOS[f.cultivo ?? '']?.nombre ?? f.cultivo ?? '').toLowerCase()
+        const cult = (CULTIVOS[f.cultivo ?? '']?.nombre ?? (f.clase ? CULTIVOS[f.clase.split('_')[0]]?.nombre : undefined) ?? (f.cultivo ? nombreVisibleGrupo(f.cultivo) : '')).toLowerCase()
         const prov = (f.provincia ?? '').toLowerCase()
         const motivo = (f.motivo ?? '').toLowerCase()
         const nota = ((f as any).nota ?? (f as any).notas ?? f.error ?? '').toLowerCase()
@@ -668,7 +677,7 @@ function Historial() {
             <View style={{ flex: 1, gap: 2 }}>
               <Text style={[s.texto, { color: C.texto, fontWeight: '700' }]}>{f.clase ? infoClase(f.clase, f.etiqueta).nombre : f.estado === 'rechazada' ? 'Foto no válida' : 'No concluyente'}</Text>
               <Text style={[s.tenue, { color: C.tenue }]}>
-                {CULTIVOS[f.cultivo ?? '']?.nombre ?? '—'}{f.provincia ? ` · ${f.provincia}` : ''} · {f.confianza ? Math.round(f.confianza * 100) + ' %' : ''} · {new Date(f.fecha).toLocaleString('es-PE')}
+                {CULTIVOS[f.cultivo ?? '']?.nombre ?? (f.clase ? CULTIVOS[f.clase.split('_')[0]]?.nombre : undefined) ?? (f.cultivo ? nombreVisibleGrupo(f.cultivo) : '—')}{f.provincia ? ` · ${f.provincia}` : ''} · {f.confianza ? Math.round(f.confianza * 100) + ' %' : ''} · {new Date(f.fecha).toLocaleString('es-PE')}
               </Text>
               {nomParcela && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
