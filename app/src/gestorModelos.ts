@@ -61,6 +61,15 @@ export const GRUPOS_MODELO: InfoGrupoCultivo[] = [
   },
 ]
 
+export const INFO_VERIFICADOR = {
+  id: 'verificador',
+  nombre: 'Verificador abierto (CLIP)',
+  archivo: 'verificador.onnx',
+  archivoTextos: 'verificador_textos.json',
+  tamano_mb: 85.0,
+  sha256: '583fd1110a514667812fee7d684952aaf82a99b959760c8d7dca7e0ab9839299',
+}
+
 export const ORDEN_PLANTAS = ['limon', 'naranja', 'papa', 'tomate', 'pimiento', 'cafe', 'cacao', 'maiz']
 
 export function plantasDeGrupo(grupo: string): string[] {
@@ -264,6 +273,41 @@ export async function estaGrupoDisponible(grupoId: string): Promise<boolean> {
 }
 
 /**
+ * Comprueba si el verificador abierto CLIP está listo (incluido o descargado).
+ */
+export async function estaVerificadorDisponible(): Promise<boolean> {
+  try {
+    if (MODELOS_INCLUIDOS.verificador) return true
+    const ruta = rutaArchivoModelo(INFO_VERIFICADOR.archivo)
+    const f = await FileSystem.getInfoAsync(ruta)
+    return !!f.exists && (f.size ?? 0) > 1000000
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Obtiene el JSON con los embeddings de texto del verificador abierto (incluido o descargado).
+ */
+export async function obtenerVerificadorTextos(): Promise<{ n_cultivos: number; umbral: number; embeds: number[][] } | null> {
+  if (MODELOS_INCLUIDOS.verificador_textos) {
+    return MODELOS_INCLUIDOS.verificador_textos
+  }
+  try {
+    const ruta = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+    const info = await FileSystem.getInfoAsync(ruta)
+    if (info.exists) {
+      const texto = await FileSystem.readAsStringAsync(ruta)
+      return JSON.parse(texto)
+    }
+  } catch {}
+  try {
+    return require('../assets/modelos/verificador_textos.json')
+  } catch {}
+  return null
+}
+
+/**
  * Comprueba de forma síncrona si el modelo está incluido en los assets del APK.
  */
 export function estaIncluidoEnApk(grupoId: string): boolean {
@@ -276,6 +320,11 @@ export function estaIncluidoEnApk(grupoId: string): boolean {
  */
 export async function rutaLocalDescargada(grupoId: string): Promise<string | null> {
   try {
+    if (grupoId === 'verificador') {
+      const ruta = rutaArchivoModelo(INFO_VERIFICADOR.archivo)
+      const f = await FileSystem.getInfoAsync(ruta)
+      return f.exists && (f.size ?? 0) > 1000000 ? ruta : null
+    }
     const infoGrupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
     if (!infoGrupo) return null
     const ruta = rutaArchivoModelo(infoGrupo.archivo)
@@ -314,25 +363,179 @@ async function verificarSha256(uri: string, shaEsperado: string): Promise<boolea
 }
 
 /**
+ * Descarga de manera independiente el verificador abierto CLIP (85 MB) y su JSON de textos.
+ */
+export async function descargarVerificador(): Promise<boolean> {
+  await asegurarDirectorioModelos()
+  const urlRemota = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivo}`
+  const rutaDestino = rutaArchivoModelo(INFO_VERIFICADOR.archivo)
+  const totalBytes = Math.round(INFO_VERIFICADOR.tamano_mb * 1024 * 1024)
+
+  notificarDescarga('verificador', { progreso: 0, bytes: 0, total: totalBytes, estado: 'descargando' })
+
+  const callback = (descarga: FileSystem.DownloadProgressData) => {
+    const total = descarga.totalBytesExpectedToWrite > 0 ? descarga.totalBytesExpectedToWrite : totalBytes
+    const progreso = total > 0 ? Math.min(1, descarga.totalBytesWritten / total) : 0
+    notificarDescarga('verificador', {
+      progreso,
+      bytes: descarga.totalBytesWritten,
+      total,
+      estado: 'descargando',
+    })
+  }
+
+  try {
+    let resumable = descargasActivas['verificador']
+    if (!resumable) {
+      resumable = FileSystem.createDownloadResumable(urlRemota, rutaDestino, {}, callback)
+      descargasActivas['verificador'] = resumable
+    }
+
+    const resultado = await resumable.downloadAsync()
+    delete descargasActivas['verificador']
+
+    if (!resultado?.uri) {
+      throw new Error('Descarga del verificador no completada')
+    }
+
+    const shaOk = await verificarSha256(resultado.uri, INFO_VERIFICADOR.sha256)
+    if (!shaOk) {
+      try { await FileSystem.deleteAsync(resultado.uri, { idempotent: true }) } catch {}
+      throw new Error('La verificación del verificador abierto no coincidió. Vuelve a intentarlo.')
+    }
+
+    try {
+      const urlTextos = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivoTextos}`
+      const rutaTextos = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+      await FileSystem.downloadAsync(urlTextos, rutaTextos)
+    } catch {
+      try {
+        const urlTextos = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivoTextos}`
+        const rutaTextos = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+        const res = await fetch(urlTextos)
+        if (res.ok) {
+          const t = await res.text()
+          await FileSystem.writeAsStringAsync(rutaTextos, t)
+        }
+      } catch {}
+    }
+
+    try {
+      const infoFinal = await FileSystem.getInfoAsync(resultado.uri)
+      await guardarMetadatosModelo('verificador', {
+        version: '1.0.0',
+        sha256: INFO_VERIFICADOR.sha256,
+        tamano_bytes: infoFinal.exists ? infoFinal.size : 0,
+      })
+    } catch {}
+
+    notificarDescarga('verificador', { progreso: 1, bytes: totalBytes, total: totalBytes, estado: 'listo' })
+    notificarCambioModelos()
+    return true
+  } catch (e: any) {
+    delete descargasActivas['verificador']
+    const err = e?.message ?? 'Error al descargar el verificador'
+    notificarDescarga('verificador', { progreso: 0, bytes: 0, total: 0, estado: 'error', error: err })
+    throw e
+  }
+}
+
+/**
  * Inicia o reanuda la descarga de un modelo especialista.
+ * Si el verificador abierto aún no está disponible, se descarga automáticamente
+ * junto con el cultivo, reportando el tamaño sumado y verificando el sha256 de ambos.
  */
 export async function descargarGrupo(grupoId: string): Promise<boolean> {
   const grupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
   if (!grupo) throw new Error(`Grupo desconocido: ${grupoId}`)
 
   await asegurarDirectorioModelos()
+
+  const faltaVerificador = !(await estaVerificadorDisponible())
+  const tamanoVerificadorMb = faltaVerificador ? INFO_VERIFICADOR.tamano_mb : 0
+  const totalMb = grupo.tamano_mb + tamanoVerificadorMb
+  const totalBytes = Math.round(totalMb * 1024 * 1024)
+
+  notificarDescarga(grupoId, { progreso: 0, bytes: 0, total: totalBytes, estado: 'descargando' })
+
+  // 1. Si falta el verificador, descargarlo primero con progreso conjunto y sha256
+  if (faltaVerificador) {
+    try {
+      const urlVerificador = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivo}`
+      const rutaVerificador = rutaArchivoModelo(INFO_VERIFICADOR.archivo)
+
+      const callbackVerificador = (descarga: FileSystem.DownloadProgressData) => {
+        const bytesActuales = descarga.totalBytesWritten
+        const progreso = totalBytes > 0 ? Math.min(1, bytesActuales / totalBytes) : 0
+        notificarDescarga(grupoId, {
+          progreso,
+          bytes: bytesActuales,
+          total: totalBytes,
+          estado: 'descargando',
+        })
+      }
+
+      let resumableVerif = descargasActivas[grupoId]
+      if (!resumableVerif) {
+        resumableVerif = FileSystem.createDownloadResumable(urlVerificador, rutaVerificador, {}, callbackVerificador)
+        descargasActivas[grupoId] = resumableVerif
+      }
+
+      const resVerif = await resumableVerif.downloadAsync()
+      delete descargasActivas[grupoId]
+
+      if (resVerif?.uri) {
+        const shaOk = await verificarSha256(resVerif.uri, INFO_VERIFICADOR.sha256)
+        if (!shaOk) {
+          try { await FileSystem.deleteAsync(resVerif.uri, { idempotent: true }) } catch {}
+          throw new Error('La verificación del verificador abierto no coincidió. Vuelve a intentarlo.')
+        }
+
+        try {
+          const urlTextos = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivoTextos}`
+          const rutaTextos = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+          await FileSystem.downloadAsync(urlTextos, rutaTextos)
+        } catch {
+          try {
+            const urlTextos = `${API}/descargas/modelos/${INFO_VERIFICADOR.archivoTextos}`
+            const rutaTextos = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+            const r = await fetch(urlTextos)
+            if (r.ok) {
+              const t = await r.text()
+              await FileSystem.writeAsStringAsync(rutaTextos, t)
+            }
+          } catch {}
+        }
+
+        try {
+          const infoFinal = await FileSystem.getInfoAsync(resVerif.uri)
+          await guardarMetadatosModelo('verificador', {
+            version: '1.0.0',
+            sha256: INFO_VERIFICADOR.sha256,
+            tamano_bytes: infoFinal.exists ? infoFinal.size : 0,
+          })
+        } catch {}
+      }
+    } catch (e: any) {
+      delete descargasActivas[grupoId]
+      const err = e?.message ?? 'Error al descargar'
+      notificarDescarga(grupoId, { progreso: 0, bytes: 0, total: 0, estado: 'error', error: err })
+      throw e
+    }
+  }
+
+  // 2. Descargar el modelo especialista del cultivo
   const urlRemota = `${API}/descargas/modelos/${grupo.archivo}`
   const rutaDestino = rutaArchivoModelo(grupo.archivo)
-
-  notificarDescarga(grupoId, { progreso: 0, bytes: 0, total: Math.round(grupo.tamano_mb * 1024 * 1024), estado: 'descargando' })
+  const bytesBase = faltaVerificador ? Math.round(INFO_VERIFICADOR.tamano_mb * 1024 * 1024) : 0
 
   const callback = (descarga: FileSystem.DownloadProgressData) => {
-    const total = descarga.totalBytesExpectedToWrite > 0 ? descarga.totalBytesExpectedToWrite : Math.round(grupo.tamano_mb * 1024 * 1024)
-    const progreso = total > 0 ? Math.min(1, descarga.totalBytesWritten / total) : 0
+    const bytesActuales = bytesBase + descarga.totalBytesWritten
+    const progreso = totalBytes > 0 ? Math.min(1, bytesActuales / totalBytes) : 0
     notificarDescarga(grupoId, {
       progreso,
-      bytes: descarga.totalBytesWritten,
-      total,
+      bytes: bytesActuales,
+      total: totalBytes,
       estado: 'descargando',
     })
   }
@@ -369,7 +572,7 @@ export async function descargarGrupo(grupoId: string): Promise<boolean> {
       })
     } catch {}
 
-    notificarDescarga(grupoId, { progreso: 1, bytes: resultado.status, total: resultado.status, estado: 'listo' })
+    notificarDescarga(grupoId, { progreso: 1, bytes: totalBytes, total: totalBytes, estado: 'listo' })
     notificarCambioModelos()
     return true
   } catch (e: any) {
@@ -399,6 +602,10 @@ export async function reanudarDescarga(grupoId: string) {
     try {
       await r.resumeAsync()
       delete descargasActivas[grupoId]
+      if (!(await estaGrupoDisponible(grupoId))) {
+        await descargarGrupo(grupoId)
+        return
+      }
       notificarDescarga(grupoId, { progreso: 1, bytes: 1, total: 1, estado: 'listo' })
       notificarCambioModelos()
     } catch (e: any) {
@@ -421,11 +628,27 @@ export async function cancelarDescarga(grupoId: string) {
     const ruta = rutaArchivoModelo(grupo.archivo)
     try { await FileSystem.deleteAsync(ruta, { idempotent: true }) } catch {}
   }
+  if (grupoId === 'verificador' || descargasActivas['verificador']) {
+    try { await descargasActivas['verificador']?.cancelAsync() } catch {}
+    delete descargasActivas['verificador']
+    try { await FileSystem.deleteAsync(rutaArchivoModelo(INFO_VERIFICADOR.archivo), { idempotent: true }) } catch {}
+  }
   notificarDescarga(grupoId, { progreso: 0, bytes: 0, total: 0, estado: 'inactiva' })
   notificarCambioModelos()
 }
 
 export async function borrarModeloDescargado(grupoId: string): Promise<void> {
+  if (grupoId === 'verificador') {
+    const rutaOnnx = rutaArchivoModelo(INFO_VERIFICADOR.archivo)
+    const rutaJson = rutaArchivoModelo(INFO_VERIFICADOR.archivoTextos)
+    try { await FileSystem.deleteAsync(rutaOnnx, { idempotent: true }) } catch {}
+    try { await FileSystem.deleteAsync(rutaJson, { idempotent: true }) } catch {}
+    try { await eliminarMetadatosModelo('verificador') } catch {}
+    try { invalidarSesionModelo('verificador') } catch {}
+    notificarDescarga('verificador', { progreso: 0, bytes: 0, total: 0, estado: 'inactiva' })
+    notificarCambioModelos()
+    return
+  }
   const grupo = GRUPOS_MODELO.find((g) => g.id === grupoId)
   if (!grupo) return
   const ruta = rutaArchivoModelo(grupo.archivo)
@@ -764,12 +987,19 @@ function formatearNombres(nombres: string[]): string {
   return `${nombres.slice(0, -1).join(', ')} y ${nombres[nombres.length - 1]}`
 }
 
+export function tamanoAMostrarGrupo(grupoId: GrupoModeloId, verificadorDisponible: boolean): number {
+  const g = GRUPOS_MODELO.find((x) => x.id === grupoId)
+  if (!g) return 0
+  return verificadorDisponible ? g.tamano_mb : Number((g.tamano_mb + INFO_VERIFICADOR.tamano_mb).toFixed(1))
+}
+
 /**
  * Hook reactivo que provee los modelos y cultivos actualmente instalados en el teléfono.
  * Se actualiza en tiempo real al descargar o borrar cualquier modelo.
  */
 export function useCultivosInstalados() {
   const [gruposInstaladosIds, setGruposInstaladosIds] = useState<GrupoModeloId[]>([])
+  const [verificadorDisponible, setVerificadorDisponible] = useState(false)
   const [cargando, setCargando] = useState(true)
 
   const refrescar = useCallback(async () => {
@@ -783,6 +1013,8 @@ export function useCultivosInstalados() {
         } catch {}
       }
       setGruposInstaladosIds(listos)
+      const verOk = await estaVerificadorDisponible()
+      setVerificadorDisponible(verOk)
     } catch {} finally {
       setCargando(false)
     }
@@ -844,6 +1076,7 @@ export function useCultivosInstalados() {
     totalGrupos: GRUPOS_MODELO.length,
     esCultivoInstalado,
     esGrupoInstalado,
+    verificadorDisponible,
     cargando,
     refrescar,
   }

@@ -20,6 +20,10 @@ import {
   plantasDeGrupo,
   useActualizacionesModelos,
   ActualizacionModelo,
+  INFO_VERIFICADOR,
+  descargarVerificador,
+  estaVerificadorDisponible,
+  tamanoAMostrarGrupo,
 } from './gestorModelos'
 import { Novedad, verificarParaDescargarModelos } from './actualizacion'
 import TarjetaActualizacion from './TarjetaActualizacion'
@@ -27,6 +31,7 @@ import TarjetaActualizacion from './TarjetaActualizacion'
 export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
   const { colores: C, brillo } = useTema()
   const [disponibles, setDisponibles] = useState<Record<string, boolean>>({})
+  const [verificadorDisponible, setVerificadorDisponible] = useState(false)
   const [avisoActualizar, setAvisoActualizar] = useState<Novedad | null>(null)
   const [mensajeSinInternet, setMensajeSinInternet] = useState<string | null>(null)
   const [actualizandoTodos, setActualizandoTodos] = useState(false)
@@ -43,6 +48,8 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
       mapa[g.id] = await estaGrupoDisponible(g.id)
     }
     setDisponibles(mapa)
+    const verOk = await estaVerificadorDisponible()
+    setVerificadorDisponible(verOk)
     alCambiar?.()
   }, [alCambiar])
 
@@ -141,6 +148,12 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
       )}
 
       <View style={{ gap: 10, marginTop: 4 }}>
+        {!verificadorDisponible && (
+          <FilaVerificador
+            validarAntesDeDescargar={validarDescarga}
+            onRefrescar={cargar}
+          />
+        )}
         {GRUPOS_MODELO.map((g) => (
           <FilaGrupo
             key={g.id}
@@ -148,6 +161,7 @@ export default function MisCultivos({ alCambiar }: { alCambiar?: () => void }) {
             instalado={!!disponibles[g.id]}
             incluidoEnApk={estaIncluidoEnApk(g.id)}
             actualizacion={tieneActualizacion(g.id)}
+            verificadorDisponible={verificadorDisponible}
             validarAntesDeDescargar={validarDescarga}
             onRefrescar={cargar}
           />
@@ -162,6 +176,7 @@ function FilaGrupo({
   instalado,
   incluidoEnApk,
   actualizacion,
+  verificadorDisponible,
   validarAntesDeDescargar,
   onRefrescar,
 }: {
@@ -169,6 +184,7 @@ function FilaGrupo({
   instalado: boolean
   incluidoEnApk: boolean
   actualizacion: ActualizacionModelo | null
+  verificadorDisponible: boolean
   validarAntesDeDescargar: () => Promise<boolean>
   onRefrescar: () => void
 }) {
@@ -232,6 +248,11 @@ function FilaGrupo({
   }
 
   const enDescarga = estado.estado === 'descargando' || estado.estado === 'pausada'
+  const tamanoAMostrar = actualizacion
+    ? actualizacion.tamano_mb
+    : instalado
+    ? grupo.tamano_mb
+    : tamanoAMostrarGrupo(grupo.id, verificadorDisponible)
 
   return (
     <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: actualizacion ? C.oro : C.borde }]}>
@@ -239,7 +260,7 @@ function FilaGrupo({
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={[s.nombre, { color: C.texto }]}>{nombreVisibleGrupo(grupo.id)}</Text>
           <Text style={[s.detalles, { color: C.tenue }]}>
-            {plantasDeGrupo(grupo.id).join(', ')} · {actualizacion ? `${actualizacion.tamano_mb} MB` : `${grupo.tamano_mb} MB`}
+            {plantasDeGrupo(grupo.id).join(', ')} · {tamanoAMostrar} MB
           </Text>
         </View>
 
@@ -352,6 +373,96 @@ function FilaGrupo({
       {estado.estado === 'error' && (
         <Text style={{ color: C.coral, fontSize: 12, marginTop: 4 }}>
           {estado.error || 'Ocurrió un error al descargar.'}
+        </Text>
+      )}
+    </View>
+  )
+}
+
+function FilaVerificador({
+  validarAntesDeDescargar,
+  onRefrescar,
+}: {
+  validarAntesDeDescargar: () => Promise<boolean>
+  onRefrescar: () => void
+}) {
+  const { colores: C } = useTema()
+  const [estado, setEstado] = useState(estadoDescargaActual('verificador'))
+
+  useEffect(() => {
+    return escucharProgreso((id, est) => {
+      if (id === 'verificador') {
+        setEstado(est)
+        if (est.estado === 'listo') onRefrescar()
+      }
+    })
+  }, [onRefrescar])
+
+  const descargar = async () => {
+    const puede = await validarAntesDeDescargar()
+    if (!puede) return
+    try {
+      await descargarVerificador()
+      onRefrescar()
+    } catch (e: any) {
+      Alert.alert('Error al descargar', e?.message ?? 'No se pudo descargar el verificador abierto.')
+    }
+  }
+
+  const enDescarga = estado.estado === 'descargando' || estado.estado === 'pausada'
+
+  return (
+    <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }]}>
+      <View style={s.cabecera}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={[s.nombre, { color: C.texto }]}>Verificador abierto (CLIP)</Text>
+          <Text style={[s.detalles, { color: C.tenue }]}>
+            Filtro de plantas ajenas al catálogo · {INFO_VERIFICADOR.tamano_mb} MB
+          </Text>
+        </View>
+
+        {!enDescarga ? (
+          <Pressable
+            onPress={descargar}
+            style={({ pressed }) => [
+              s.botonDescargar,
+              { backgroundColor: C.acento },
+              pressed && { opacity: 0.7 },
+            ]}
+          >
+            <Text style={[s.botonDescargarTxt, { color: C.textoBotonAcento }]}>Descargar</Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {enDescarga && (
+        <View style={{ marginTop: 8, gap: 6 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Text style={[s.detalles, { color: C.acento, fontWeight: '700' }]}>
+              {estado.estado === 'pausada' ? 'Descarga en pausa' : 'Descargando verificador…'}{' '}
+              {Math.round(estado.progreso * 100)} %
+            </Text>
+            <Pressable onPress={() => cancelarDescarga('verificador')} hitSlop={8}>
+              <Text style={{ color: C.coral, fontSize: 13, fontWeight: '700' }}>Cancelar</Text>
+            </Pressable>
+          </View>
+          <View style={[s.pista, { backgroundColor: C.fondo2 }]}>
+            <View
+              style={[
+                s.barra,
+                {
+                  width: `${Math.round(estado.progreso * 100)}%`,
+                  backgroundColor: C.acento,
+                },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
+      {estado.estado === 'error' && (
+        <Text style={{ color: C.coral, fontSize: 12, marginTop: 4 }}>
+          {estado.error || 'Ocurrió un error al descargar el verificador.'}
         </Text>
       )}
     </View>

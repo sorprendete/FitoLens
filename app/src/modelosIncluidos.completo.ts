@@ -6,4 +6,6 @@ export const MODELOS_INCLUIDOS: Record<string, any> = {
   cacao: require('../assets/modelos/cacao.onnx'),
   maiz: require('../assets/modelos/maiz.onnx'),
   citricos: require('../assets/modelos/citricos.onnx'),
+  verificador: require('../assets/modelos/verificador.onnx'),
+  verificador_textos: require('../assets/modelos/verificador_textos.json'),
 }

@@ -1,12 +1,14 @@
 // Pantalla inicial para elegir cultivos en la variante liviana de la app.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTema } from './tema'
 import {
   GRUPOS_MODELO,
   GrupoModeloId,
+  INFO_VERIFICADOR,
   descargarGrupo,
+  estaVerificadorDisponible,
   marcarSetupInicialCompletado,
   nombreVisibleGrupo,
   plantasDeGrupo,
@@ -33,14 +35,22 @@ export default function PantallaEleccionInicial({
   const [descargando, setDescargando] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [actualizacionReq, setActualizacionReq] = useState<Novedad | null>(null)
+  const [verificadorListo, setVerificadorListo] = useState(false)
+
+  useEffect(() => {
+    estaVerificadorDisponible().then(setVerificadorListo).catch(() => {})
+  }, [visible])
 
   const toggle = (id: GrupoModeloId) => {
     setSeleccionados((s) => ({ ...s, [id]: !s[id] }))
   }
 
-  const tamanoTotal = GRUPOS_MODELO.filter((g) => seleccionados[g.id])
+  const haySeleccion = GRUPOS_MODELO.some((g) => seleccionados[g.id])
+  const sumaGrupos = GRUPOS_MODELO.filter((g) => seleccionados[g.id])
     .reduce((acc, g) => acc + g.tamano_mb, 0)
-    .toFixed(1)
+  const tamanoTotal = (
+    sumaGrupos + (haySeleccion && !verificadorListo ? INFO_VERIFICADOR.tamano_mb : 0)
+  ).toFixed(1)
 
   const iniciarDescargas = async () => {
     setError(null)
@@ -147,6 +157,11 @@ export default function PantallaEleccionInicial({
                 <Text style={[s.totalTxt, { color: C.texto }]}>Descarga total seleccionada:</Text>
                 <Text style={[s.totalMB, { color: C.acento }]}>{tamanoTotal} MB</Text>
               </View>
+              {haySeleccion && !verificadorListo && (
+                <Text style={[s.tenue, { color: C.tenue, fontSize: 12, marginTop: -4, textAlign: 'center' }]}>
+                  Incluye verificador abierto CLIP ({INFO_VERIFICADOR.tamano_mb} MB) para rechazar plantas ajenas
+                </Text>
+              )}
 
               {error && (
                 <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.coral }]}>

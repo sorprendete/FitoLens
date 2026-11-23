@@ -2,8 +2,8 @@
 // En paralelo, U2-Net-p ubica la hoja (solo para dibujar el contorno y recortar el mapa de calor: no cambia el diagnÃ³stico).
 import { Asset } from 'expo-asset'
 import { manifest, obtenerFuenteModelo, estaModeloInstalado } from './modelos'
-import { nombreVisibleGrupo, registrarLimpiadorSesion } from './gestorModelos'
-import { aTensor } from './imagen'
+import { nombreVisibleGrupo, obtenerVerificadorTextos, registrarLimpiadorSesion } from './gestorModelos'
+import { aTensor, aTensorVerificador } from './imagen'
 import { ATENCION_MIN_DENTRO, LADO, Punto, Segmentacion, analizar, aptaPara, fraccionDentro, huecosMordedura, mapaCalor } from './vision'
 
 export type Paso = { id: string; titulo: string; detalle: string; ms: number }
@@ -18,6 +18,7 @@ export type Resultado = {
   prob_cultivos?: number
   prob_otra?: number
   prob_no_planta?: number
+  prob_verificador?: number
   energia?: number
 }
 // "VisiÃ³n de la IA": va aparte del resultado para no llenar el historial con imÃ¡genes.
@@ -121,6 +122,77 @@ async function ubicarHoja(tensor: Tensor): Promise<Segmentacion | null> {
   } catch { return null } // nunca rompe un diagnÃ³stico
 }
 
+export async function obtenerUmbralVerificador(): Promise<number> {
+  try {
+    const t = await obtenerVerificadorTextos()
+    if (t && typeof t.umbral === 'number') return t.umbral
+  } catch {}
+  return 0.25
+}
+
+export async function probCultivoVerificador(uri: string): Promise<number | null> {
+  if (!ort?.InferenceSession) return null
+  try {
+    const textos = await obtenerVerificadorTextos()
+    if (!textos || !Array.isArray(textos.embeds) || textos.embeds.length === 0) return null
+
+    const tensorClip = await aTensorVerificador(uri)
+    const s = await sesion('verificador')
+    const entrada = { pixel_values: new ort!.Tensor('float32', tensorClip, [1, 3, 224, 224]) }
+    const salidas = await s.run(entrada)
+
+    const raw = salidas.image_embeds?.data ?? (s.outputNames?.[0] ? salidas[s.outputNames[0]]?.data : null)
+    if (!raw) return null
+
+    const vRaw = raw as Float32Array
+    let norma = 0
+    for (let j = 0; j < 512; j++) {
+      norma += vRaw[j] * vRaw[j]
+    }
+    norma = Math.sqrt(norma)
+    if (!norma || !Number.isFinite(norma)) return null
+
+    const embeds = textos.embeds
+    const kTotal = embeds.length
+    const z = new Float32Array(kTotal)
+    for (let k = 0; k < kTotal; k++) {
+      let dot = 0
+      const row = embeds[k]
+      for (let j = 0; j < 512; j++) {
+        dot += row[j] * (vRaw[j] / norma)
+      }
+      z[k] = 100.0 * dot
+    }
+
+    let maxZ = -Infinity
+    for (let k = 0; k < kTotal; k++) {
+      if (z[k] > maxZ) maxZ = z[k]
+    }
+
+    let sumExp = 0
+    const p = new Float32Array(kTotal)
+    for (let k = 0; k < kTotal; k++) {
+      const e = Math.exp(z[k] - maxZ)
+      p[k] = e
+      sumExp += e
+    }
+    if (sumExp === 0) return null
+
+    for (let k = 0; k < kTotal; k++) {
+      p[k] /= sumExp
+    }
+
+    const nCultivos = textos.n_cultivos ?? 8
+    let probSumada = 0
+    for (let k = 0; k < nCultivos; k++) {
+      probSumada += p[k]
+    }
+    return probSumada
+  } catch {
+    return null
+  }
+}
+
 const softmax = (x: number[], t = 1) => {
   const z = x.map((v) => v / t), mx = Math.max(...z), e = z.map((v) => Math.exp(v - mx)), s = e.reduce((a, b) => a + b, 0)
   return e.map((v) => v / s)
@@ -211,6 +283,26 @@ export async function diagnosticarLocal(uri: string): Promise<Resultado & { visi
     r.motivo_codigo = 'otra_planta'
     r.motivo = MOTIVO_OTRA_PLANTA
     return fin()
+  }
+
+  // PASO 2b: verificador abierto (CLIP). El router puede estar muy seguro ante plantas que nunca vio (coco, palma...).
+  try {
+    const verifDisponible = await estaModeloInstalado('verificador')
+    if (verifDisponible) {
+      const pClip = await probCultivoVerificador(uri)
+      if (pClip !== null) {
+        r.prob_verificador = Math.round(pClip * 10000) / 10000
+        const umbralVerificador = await obtenerUmbralVerificador()
+        if (pClip < umbralVerificador) {
+          r.estado = 'rechazada'
+          r.motivo_codigo = 'otra_planta'
+          r.motivo = MOTIVO_OTRA_PLANTA
+          return fin()
+        }
+      }
+    }
+  } catch {
+    // Si el verificador no está disponible o falla, la app sigue funcionando sin él
   }
 
   // Reglas de energÃ­a en router (desactivadas por defecto)

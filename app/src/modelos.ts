@@ -1,10 +1,10 @@
 // Catálogo y resolución de archivos .onnx (incluidos en APK o descargados en documentDirectory/modelos/).
 import { MODELOS_INCLUIDOS } from './modelosIncluidos'
-import { estaGrupoDisponible, rutaLocalDescargada } from './gestorModelos'
+import { estaGrupoDisponible, estaVerificadorDisponible, rutaLocalDescargada } from './gestorModelos'
 
 const INFO: { modelos: any[] } = require('../assets/modelos/modelos.json')
 
-export type NombreModelo = 'router' | 'hortalizas' | 'cafe' | 'cacao' | 'maiz' | 'citricos'
+export type NombreModelo = 'router' | 'hortalizas' | 'cafe' | 'cacao' | 'maiz' | 'citricos' | 'verificador'
 
 export type FuenteModelo =
   | { tipo: 'asset'; recurso: number }
@@ -36,6 +36,9 @@ export async function obtenerFuenteModelo(n: string): Promise<FuenteModelo | nul
  * Comprueba si el modelo está listo para inferir sin internet.
  */
 export async function estaModeloInstalado(n: string): Promise<boolean> {
+  if (n === 'verificador') {
+    return estaVerificadorDisponible()
+  }
   return estaGrupoDisponible(n)
 }
 
