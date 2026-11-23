@@ -14,6 +14,8 @@ from app.ia import mapa_calor
 from app.ia.modelo import promedio, softmax
 from app.ia.registro import Registro
 from app.ia.segmentacion import Segmentacion, Segmentador, apta_para, huecos_mordedura
+from app.ia.verificador import cargar as cargar_verificador
+from pathlib import Path
 
 _HILOS: ThreadPoolExecutor | None = None
 
@@ -100,6 +102,7 @@ class Resultado:
     prob_cultivos: float | None = None
     prob_otra: float | None = None
     prob_no_planta: float | None = None
+    prob_verificador: float | None = None  # prob. de cultivo soportado según el verificador abierto (CLIP)
     energia: float | None = None
 
 
@@ -201,6 +204,22 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
         r.motivo_codigo = "otra_planta"
         r.motivo = MOTIVO_OTRA_PLANTA
         return r
+
+    # PASO 2b: verificador abierto (CLIP). El router puede estar muy seguro ante plantas que nunca vio (coco, palma...).
+    if cfg.verificador_umbral is not None:
+        ver = cargar_verificador(Path(cfg.modelos_dir) / "verificador")
+        if ver is not None:
+            try:
+                p_clip = ver.prob_cultivo(imagen)
+            except Exception:
+                p_clip = None
+            if p_clip is not None:
+                r.prob_verificador = round(p_clip, 4)
+                if p_clip < cfg.verificador_umbral:
+                    r.estado = "rechazada"
+                    r.motivo_codigo = "otra_planta"
+                    r.motivo = MOTIVO_OTRA_PLANTA
+                    return r
 
     # Reglas de energía en router (desactivadas por defecto)
     if cfg.ood_umbral_energia_router is not None and energia_r > cfg.ood_umbral_energia_router:

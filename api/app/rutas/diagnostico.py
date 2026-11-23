@@ -76,6 +76,8 @@ async def crear(
         detalle_partes.append(f"motivo_codigo={r.motivo_codigo}")
     if r.prob_cultivos is not None:
         detalle_partes.append(f"prob_cultivos={r.prob_cultivos:.3f}")
+    if r.prob_verificador is not None:
+        detalle_partes.append(f"prob_verificador={r.prob_verificador:.3f}")
     if r.prob_otra is not None:
         detalle_partes.append(f"prob_otra={r.prob_otra:.3f}")
     if r.prob_no_planta is not None:

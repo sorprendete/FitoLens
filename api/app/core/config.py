@@ -60,6 +60,8 @@ class Ajustes(BaseSettings):
     ood_u2: float = 0.55  # prob max del cultivo < U2 -> rechazo (compatibilidad)
     ood_u3: float | None = None  # energia router > U3 -> rechazo
     ood_u4: float | None = None  # energia especialista > U4 -> rechazo
+    # Verificador abierto (CLIP) en <modelos>/verificador: prob. de cultivo soportado < umbral -> rechazo. None lo apaga.
+    verificador_umbral: float | None = 0.25
 
     @property
     def ood_umbral_min_cultivos(self) -> float:

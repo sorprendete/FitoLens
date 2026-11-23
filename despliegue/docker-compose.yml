@@ -1,4 +1,4 @@
-# FitoLens: todo el sistema en un archivo.
+﻿# FitoLens: todo el sistema en un archivo.
 # Uso normal (VPS):   ./fitolens.sh actualizar
 # Plan B (laptop):    ./fitolens.sh offline
 name: fitolens
@@ -17,7 +17,7 @@ services:
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
-      - ./descargas:/srv/descargas:ro   # APK de la app móvil (scripts/publicar_apk.sh)
+      - ./descargas:/srv/descargas:ro   # APK de la app mÃ³vil (scripts/publicar_apk.sh)
       - caddy_datos:/data          # certificados HTTPS
       - caddy_config:/config
     depends_on: [web, api]
@@ -28,7 +28,7 @@ services:
     build:                         # sirve el React compilado en el puerto 80 interno
       context: ../web
       args:
-        VITE_MODO_DEMO: ${VITE_MODO_DEMO:-false}   # Plan B offline: true o vacío
+        VITE_MODO_DEMO: ${VITE_MODO_DEMO:-false}   # Plan B offline: true o vacÃ­o
 
   api:
     <<: *comun
@@ -47,7 +47,7 @@ services:
       timeout: 5s
       retries: 3
     deploy:
-      resources: { limits: { memory: 6g } }
+      resources: { limits: { memory: 7g } }
 
   db:
     <<: *comun
