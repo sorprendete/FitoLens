@@ -54,6 +54,33 @@ class Ajustes(BaseSettings):
     maiz_margen_ambiguedad: float = 0.15
     maiz_umbral_huecos: float = 0.03
 
+    # Detección de fuera de distribución (OOD)
+    ood_min_cultivos: float = 0.70  # suma prob cultivos soportados >= 0.70 para admitir
+    ood_u1: float = 0.25  # prob(otra_planta + no_planta) > U1 -> rechazo (compatibilidad)
+    ood_u2: float = 0.55  # prob max del cultivo < U2 -> rechazo (compatibilidad)
+    ood_u3: float | None = None  # energia router > U3 -> rechazo
+    ood_u4: float | None = None  # energia especialista > U4 -> rechazo
+
+    @property
+    def ood_umbral_min_cultivos(self) -> float:
+        return self.ood_min_cultivos
+
+    @property
+    def ood_umbral_otra_no_planta(self) -> float:
+        return self.ood_u1
+
+    @property
+    def ood_umbral_prob_cultivo(self) -> float:
+        return self.ood_u2
+
+    @property
+    def ood_umbral_energia_router(self) -> float | None:
+        return self.ood_u3
+
+    @property
+    def ood_umbral_energia_especialista(self) -> float | None:
+        return self.ood_u4
+
     log_nivel: str = "INFO"
 
     @property

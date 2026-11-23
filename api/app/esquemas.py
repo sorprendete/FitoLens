@@ -23,6 +23,7 @@ class Paso(BaseModel):
 
 
 class DiagnosticoSalida(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     id: int
     estado: str
     cultivo: str | None
@@ -37,6 +38,7 @@ class DiagnosticoSalida(BaseModel):
     pasos: list[Paso]
     modelo_version: str
     motivo: str | None
+    motivo_codigo: str | None = None
     duracion_ms: int
 
 

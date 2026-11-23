@@ -71,7 +71,18 @@ async def crear(
         provincia=provincia, latitud=latitud, longitud=longitud,
         modelo_version=r.modelo_version, imagen_sha256=sha, duracion_ms=duracion,
     )
-    detalle = f"{r.estado}: {r.clase or r.motivo or ''} ({r.confianza or 0:.2f})"
+    detalle_partes = [f"{r.estado}: {r.clase or r.motivo or ''} ({r.confianza or 0:.2f})"]
+    if r.motivo_codigo:
+        detalle_partes.append(f"motivo_codigo={r.motivo_codigo}")
+    if r.prob_cultivos is not None:
+        detalle_partes.append(f"prob_cultivos={r.prob_cultivos:.3f}")
+    if r.prob_otra is not None:
+        detalle_partes.append(f"prob_otra={r.prob_otra:.3f}")
+    if r.prob_no_planta is not None:
+        detalle_partes.append(f"prob_no_planta={r.prob_no_planta:.3f}")
+    if r.energia is not None:
+        detalle_partes.append(f"energia={r.energia:.3f}")
+    detalle = " | ".join(detalle_partes)
     await run_in_threadpool(_registrar, sesion, request, fila, r.estado, usuario, detalle)
     if a.guardar_imagenes:
         await run_in_threadpool(_guardar, datos, sha, r.cultivo or r.estado)

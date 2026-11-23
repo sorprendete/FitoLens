@@ -48,17 +48,37 @@ MOTIVO_HUECOS_MAIZ = "Se detectaron varios huecos de mordedura en la hoja."
 NOMBRES_CULTIVO = {"pimiento": "pimiento", "papa": "papa", "tomate": "tomate", "cafe": "café", "cacao": "cacao",
                    "maiz": "maíz", "limon": "limón", "naranja": "naranja"}
 _VOLTEO = "; como dudaba, revisó también la foto de cabeza"
+MOTIVO_NO_PLANTA = "Esto no parece una planta. Toma una foto de cerca de una hoja, fruto o mazorca."
+MOTIVO_OTRA_PLANTA = "Es una planta, pero no es de los cultivos que FitoLens analiza: cafe, cacao, maiz, papa, tomate, pimiento, limon y naranja."
+MOTIVO_OOD = MOTIVO_OTRA_PLANTA
+MOTIVO_NO_CONCLUYENTE = "No estoy seguro. Toma otra foto más cerca y con buena luz."
 MOTIVOS = {
-    "no_planta": "La foto no parece una planta. Toma la foto de cerca a una hoja o mazorca, con buena luz.",
-    "otra_planta": "Parece otra planta. FitoLens diagnostica pimiento, papa, tomate, café, cacao, maíz, limón y naranja.",
+    "no_planta": MOTIVO_NO_PLANTA,
+    "otra_planta": MOTIVO_OTRA_PLANTA,
     "router_duda": "No se pudo reconocer el cultivo con seguridad. Prueba con una foto más cercana y nítida.",
     "sin_especialista": "Todavía no hay un modelo instalado para este cultivo.",
-    "especialista_duda": (
-        "El modelo no está seguro. Puede ser un problema que no conoce (plaga, deficiencia, daño "
-        "mecánico) o una foto poco clara. No se emite diagnóstico para evitar un error."
-    ),
+    "especialista_duda": MOTIVO_NO_CONCLUYENTE,
     "maiz_ambiguo": MOTIVO_MAIZ_AMBIGUO,
+    "ood": MOTIVO_OTRA_PLANTA,
 }
+
+
+def logsumexp(logits: np.ndarray) -> float:
+    m = float(np.max(logits))
+    return float(m + np.log(np.sum(np.exp(logits - m))))
+
+
+def energia(logits: np.ndarray) -> float:
+    return -logsumexp(logits)
+
+
+def entropia_normalizada(p: np.ndarray) -> float:
+    k = len(p)
+    if k <= 1:
+        return 0.0
+    p_pos = p[p > 0]
+    h = -float(np.sum(p_pos * np.log(p_pos)))
+    return float(h / np.log(k))
 
 
 @dataclass
@@ -76,6 +96,11 @@ class Resultado:
     pasos: list[dict] = field(default_factory=list)
     modelo_version: str = ""
     motivo: str | None = None
+    motivo_codigo: str | None = None
+    prob_cultivos: float | None = None
+    prob_otra: float | None = None
+    prob_no_planta: float | None = None
+    energia: float | None = None
 
 
 class _Cronometro:
@@ -146,18 +171,57 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     cultivo, conf = m.ids[i], float(p[i])
     _paso(r, "router", "¿Qué planta es?",
           f"{m.clases[i].etiqueta} con {conf:.0%} de confianza" + (_VOLTEO if volteo else ""), reloj.vuelta())
-    if cultivo in m.rechazo:
-        r.motivo = MOTIVOS.get(cultivo, MOTIVOS["otra_planta"])
+
+    try:
+        cfg = ajustes()
+    except Exception:  # sin variables de entorno (scripts y pruebas sueltas): umbrales por defecto
+        from app.core.config import Ajustes
+        cfg = Ajustes.model_construct()
+    rechazo_ids = set(m.rechazo) if m.rechazo else {"otra_planta", "no_planta"}
+    p_no_planta = float(p[m.ids.index("no_planta")]) if "no_planta" in m.ids else 0.0
+    p_otra = float(p[m.ids.index("otra_planta")]) if "otra_planta" in m.ids else 0.0
+    prob_cultivos = float(sum(p[k] for k, c in enumerate(m.clases) if c.id not in rechazo_ids))
+    energia_r = float(energia(logits))
+
+    r.prob_cultivos = round(prob_cultivos, 4)
+    r.prob_otra = round(p_otra, 4)
+    r.prob_no_planta = round(p_no_planta, 4)
+    r.energia = round(energia_r, 4)
+
+    # PASO 1 '¿es una planta?': si p(no_planta) es la mayor o p(no_planta) > p(otra_planta) y la suma de cultivos < 0.70
+    if cultivo == "no_planta" or (p_no_planta > p_otra and prob_cultivos < cfg.ood_min_cultivos):
+        r.estado = "rechazada"
+        r.motivo_codigo = "no_planta"
+        r.motivo = MOTIVO_NO_PLANTA
         return r
+
+    # PASO 2 '¿es un cultivo que analizo?': si la ganadora es otra_planta o la suma de cultivos soportados < 0.70
+    if cultivo == "otra_planta" or prob_cultivos < cfg.ood_min_cultivos:
+        r.estado = "rechazada"
+        r.motivo_codigo = "otra_planta"
+        r.motivo = MOTIVO_OTRA_PLANTA
+        return r
+
+    # Reglas de energía en router (desactivadas por defecto)
+    if cfg.ood_umbral_energia_router is not None and energia_r > cfg.ood_umbral_energia_router:
+        r.estado = "rechazada"
+        if p_no_planta > p_otra:
+            r.motivo_codigo = "no_planta"
+            r.motivo = MOTIVO_NO_PLANTA
+        else:
+            r.motivo_codigo = "otra_planta"
+            r.motivo = MOTIVO_OTRA_PLANTA
+        return r
+
     if conf < m.umbral:
-        r.estado, r.motivo = "no_concluyente", MOTIVOS["router_duda"]
+        r.estado, r.motivo_codigo, r.motivo = "no_concluyente", "no_concluyente", MOTIVOS["router_duda"]
         return r
     r.cultivo = cultivo
 
     # 2. Especialista del cultivo
     esp = registro.especialista(cultivo)
     if esp is None:
-        r.estado, r.motivo = "no_concluyente", MOTIVOS["sin_especialista"]
+        r.estado, r.motivo_codigo, r.motivo = "no_concluyente", "no_concluyente", MOTIVOS["sin_especialista"]
         return r
     r.modelo_version = f"{router.version}+{esp.version}"
     salida = esp.predecir(imagen)
@@ -169,6 +233,21 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     if volteo:
         salida = promedio(salida, esp.predecir(imagen, volteada=True))
         p = softmax(salida.logits[indices], em.temperatura)
+
+    # Energía OOD del especialista (logits antes de temperatura)
+    energia_esp = energia(salida.logits)
+    if cfg.ood_umbral_energia_especialista is not None and energia_esp > cfg.ood_umbral_energia_especialista:
+        r.estado = "rechazada"
+        r.cultivo = None
+        r.clase = None
+        r.etiqueta = None
+        r.confianza = None
+        r.enferma = False
+        r.top3 = []
+        r.motivo_codigo = "otra_planta"
+        r.motivo = MOTIVO_OTRA_PLANTA
+        return r
+
     _paso(r, "especialista", f"Modelo de {NOMBRES_CULTIVO.get(cultivo, cultivo)}",
           f"Compara la foto con {len(indices)} condiciones que conoce" + (_VOLTEO if volteo else ""),
           reloj.vuelta())
@@ -176,13 +255,14 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
     # 3. Calibración y umbral
     orden = np.argsort(p)[::-1]
     r.top3 = [{"clase": em.clases[indices[k]].id, "etiqueta": em.clases[indices[k]].etiqueta,
-               "confianza": round(float(p[k]), 4)} for k in orden[:3]]
+               "confianza": round(min(conf * float(p[k]), 0.99), 4)} for k in orden[:3]]
     mejor = indices[orden[0]]
-    clase, r.confianza = em.clases[mejor], round(float(p[orden[0]]), 4)
+    clase = em.clases[mejor]
+    r.confianza = round(min(conf * float(p[orden[0]]), 0.99), 4)
     _paso(r, "calibracion", "¿Qué tan segura está?",
           f"Confianza calibrada {r.confianza:.0%}; mínimo exigido {em.umbral:.0%}", reloj.vuelta())
     if r.confianza < em.umbral:
-        r.estado, r.motivo = "no_concluyente", MOTIVOS["especialista_duda"]
+        r.estado, r.motivo_codigo, r.motivo = "no_concluyente", "no_concluyente", MOTIVOS["especialista_duda"]
     else:
         r.estado, r.clase, r.etiqueta, r.enferma = "diagnostico", clase.id, clase.etiqueta, not clase.sana
 
@@ -197,7 +277,7 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
                 break
         if p_otra >= MARGEN_AMBIGUEDAD_MAIZ or abs(r.confianza - p_otra) < MARGEN_AMBIGUEDAD_MAIZ:
             r.estado, r.clase, r.etiqueta, r.enferma = "no_concluyente", None, None, False
-            r.motivo = MOTIVO_MAIZ_AMBIGUO
+            r.motivo_codigo, r.motivo = "no_concluyente", MOTIVOS["maiz_ambiguo"]
 
     # 4. Dónde está la hoja (calculado en paralelo)
     hoja = _hoja(r, tarea, reloj)
@@ -214,7 +294,7 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
             r.clase = "maiz_gusano_cogollero"
             r.etiqueta = clase_cogollero.etiqueta
             r.enferma = not clase_cogollero.sana
-            r.confianza = round(max(p_cogollero, 0.6), 4)
+            r.confianza = round(min(max(conf * p_cogollero, 0.6), 0.99), 4)
             r.motivo = MOTIVO_HUECOS_MAIZ
             if idx_cogollero is not None:
                 mejor = idx_cogollero
@@ -239,4 +319,6 @@ def _diagnosticar(registro: Registro, imagen: Image.Image, reloj: _Cronometro, t
         _paso(r, "mapa_calor", "¿Dónde miró?",
               "Las zonas rojas son las que más pesaron en la decisión", reloj.vuelta())
     del cam_mejor, hoja
+    if r.confianza is not None:
+        r.confianza = min(r.confianza, 0.99)
     return r
