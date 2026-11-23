@@ -110,7 +110,7 @@ export default function Diagnostico() {
               <button className="btn sec" onClick={reiniciar}><RotateCcw />Inicio</button>
             </div>
           </div>
-          <div className="tarjeta resultado" aria-live="polite" ref={tarjeta}>
+          <div className="tarjeta resultado" id="resultado" aria-live="polite" ref={tarjeta}>
             {cargando && <Cargando />}
             {error && <Aviso icono={AlertTriangle} tono="mal" titulo="No se pudo analizar" texto={error} />}
             {res && <Resultado r={res} onOtra={() => setCamara(true)} version={version} archivo={enviada} />}
@@ -230,49 +230,69 @@ function Dibujo({ tipo }) {
 
 function Resultado({ r, onOtra, version, archivo }) {
   const otra = <button className="btn enorme ancho" onClick={onOtra}><Camera size={26} />Tomar otra foto</button>
-  if (r.estado === 'rechazada') return (
-    <>
-      <Aviso icono={ShieldAlert} tono="aviso" titulo="Esta foto no es de un cultivo soportado"
-        texto={r.motivo || 'Toma la foto de una hoja de café, maíz, limón, naranja, papa, tomate o pimiento, o de una mazorca de cacao.'} />
-      <Voz r={r} />
-      <ConsejosFoto />
-      {otra}
-      <details className="bloque"><summary>Cómo lo decidió la IA</summary><Pasos pasos={r.pasos} /></details>
-    </>
-  )
+  const esRechazada = r.estado === 'rechazada'
+  const esNoConcluyente = r.estado === 'no_concluyente'
+
+  if (esRechazada || esNoConcluyente) {
+    let titulo = 'No reconozco esta planta'
+    let icono = ShieldAlert
+    let texto = r.motivo
+
+    if (esNoConcluyente) {
+      titulo = 'No estoy seguro'
+      icono = CircleHelp
+      texto = r.motivo || 'No estoy seguro. Toma otra foto más cerca y con buena luz.'
+    } else if (r.motivo_codigo === 'no_planta') {
+      titulo = 'No parece una planta'
+      icono = ShieldAlert
+      texto = r.motivo || 'Esto no parece una planta. Toma una foto de cerca de una hoja, fruto o mazorca.'
+    } else {
+      titulo = 'No reconozco esta planta'
+      icono = ShieldAlert
+      const detalleOtras = 'Cultivos soportados: café, cacao, maíz, limón, naranja, papa, tomate y pimiento.'
+      texto = (r.motivo ? `${r.motivo} ` : 'Es una planta, pero no es de los cultivos que FitoLens analiza. ') + detalleOtras
+    }
+
+    return (
+      <>
+        <Aviso icono={icono} tono="aviso" titulo={titulo} texto={texto} />
+        <Voz r={r} />
+        <ConsejosFoto />
+        {otra}
+        {r.pasos?.length > 0 && (
+          <details className="bloque">
+            <summary>Cómo lo decidió la IA</summary>
+            <Pasos pasos={r.pasos} />
+          </details>
+        )}
+        <p className="tenue pequeno">Orientación de apoyo, no reemplaza la visita de un agrónomo. Modelo {r.modelo_version}{version ? ` · ${version}` : ''}.</p>
+      </>
+    )
+  }
+
   const info = infoClase(r.clase, r.etiqueta)
   const cultivo = CULTIVOS[r.cultivo]
-  const dudosa = r.estado === 'no_concluyente'
   const umbral = r.pasos?.find((p) => p.id === 'calibracion')?.umbral
   const urg = URGENCIA[info.urgencia]
   const sana = esSana(r.clase)
   return (
     <>
       {cultivo && <p className="chip-cultivo" style={{ '--c': cultivo.color }}>{cultivo.nombre} <i>{cultivo.cientifico}</i></p>}
-      {dudosa ? (
-        <>
-          <Aviso icono={CircleHelp} tono="aviso" titulo="No concluyente"
-            texto={r.motivo || 'La IA no está lo bastante segura para darte un diagnóstico. Repite la foto así:'} />
-          <ConsejosFoto />
-        </>
-      ) : (
-        <div className={`veredicto ${sana ? 'es-sana' : 'es-enferma'}`}>
-          {sana ? <CircleCheck size={52} /> : <AlertTriangle size={52} />}
-          <div>
-            <h2>{info.nombre}</h2>
-            {info.agente !== 'Ninguno' && <p className="cientifico">{info.agente}</p>}
-          </div>
-          <div className="veredicto-conf"><b>{Math.round(r.confianza * 100)}%</b><span>seguro</span></div>
+      <div className={`veredicto ${sana ? 'es-sana' : 'es-enferma'}`}>
+        {sana ? <CircleCheck size={52} /> : <AlertTriangle size={52} />}
+        <div>
+          <h2>{info.nombre}</h2>
+          {info.agente !== 'Ninguno' && <p className="cientifico">{info.agente}</p>}
         </div>
-      )}
-      {!dudosa && urg && <p className={`urgencia ${urg.tono}`}>{urg.texto}</p>}
-      {!dudosa && <p className="consejo grande">{info.consejo}</p>}
+        <div className="veredicto-conf"><b>{Math.round(r.confianza * 100)}%</b><span>seguro</span></div>
+      </div>
+      {urg && <p className={`urgencia ${urg.tono}`}>{urg.texto}</p>}
+      <p className="consejo grande">{info.consejo}</p>
       <Voz r={r} info={info} sana={sana} />
       {otra}
       <BotonReporte r={r} archivo={archivo} />
 
-      <Barra etiqueta={dudosa ? `Más probable: ${info.nombre}` : 'Confianza calibrada'} valor={r.confianza}
-        tono={dudosa ? 'aviso' : 'ok'} marca={umbral} />
+      <Barra etiqueta="Confianza calibrada" valor={r.confianza} tono="ok" marca={umbral} />
       {r.top3?.length > 1 && (
         <details className="bloque">
           <summary>Otras posibilidades</summary>

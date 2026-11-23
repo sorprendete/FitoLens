@@ -46,7 +46,7 @@ export async function enviar(uri: string, provincia?: string | null): Promise<Re
   if (provincia) f.append('provincia', provincia)
   const d = await pedir('/api/diagnostico', f)
   return { estado: d.estado, cultivo: d.cultivo, clase: d.clase, etiqueta: d.etiqueta, confianza: d.confianza, top3: d.top3 ?? [],
-    motivo: d.motivo, ms: d.duracion_ms, version: d.modelo_version, origen: 'servidor' }
+    motivo: d.motivo, motivo_codigo: d.motivo_codigo, ms: d.duracion_ms, version: d.modelo_version, origen: 'servidor' }
 }
 
 // Foto más liviana para subir con señal débil en el campo (lado mayor 1600 px).

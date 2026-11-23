@@ -282,56 +282,69 @@ export function TarjetaResultado({
     )
   }
 
-  if (r.estado === 'rechazada') return (
-    <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }, brillo(C.coral)]}>
-      <Text style={[s.sobre, { color: C.coral }]}>FOTO NO VÁLIDA</Text>
-      <Text style={[s.nombre, { color: C.texto }]}>Esta foto no es de un cultivo soportado</Text>
-      <Text style={[s.consejoTxt, { color: C.texto }]}>{r.motivo}</Text>
-      <Voz r={r} />
-      <ConsejosFoto />
-      <BotonOtra onPress={onOtra} />
-      <Plegable titulo="Cómo lo decidió la IA"><Pasos r={r} /></Plegable>
-    </View>
-  )
+  if (r.estado === 'rechazada') {
+    const esNoPlanta = r.motivo_codigo === 'no_planta'
+    const sobre = esNoPlanta ? 'NO ES UNA PLANTA' : 'PLANTA NO RECONOCIDA'
+    const titulo = esNoPlanta ? 'Esto no parece una planta' : 'No reconozco esta planta'
+    const texto = esNoPlanta
+      ? (r.motivo || 'Esto no parece una planta. Toma una foto de cerca de una hoja, fruto o mazorca.')
+      : (r.motivo ? `${r.motivo}\n\n` : '') + 'Cultivos soportados: café, cacao, maíz, limón, naranja, papa, tomate y pimiento.'
+
+    return (
+      <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }, brillo(C.coral)]}>
+        <Text style={[s.sobre, { color: C.coral }]}>{sobre}</Text>
+        <Text style={[s.nombre, { color: C.texto }]}>{titulo}</Text>
+        <Text style={[s.consejoTxt, { color: C.texto }]}>{texto}</Text>
+        <Voz r={r} />
+        <ConsejosFoto />
+        <BotonOtra onPress={onOtra} />
+        <Plegable titulo="Cómo lo decidió la IA"><Pasos r={r} /></Plegable>
+      </View>
+    )
+  }
 
   const dudosa = r.estado === 'no_concluyente'
-  const sana = !dudosa && esSana(r.clase ?? ''), info = infoClase(r.clase ?? r.top3[0]?.clase ?? '', r.clase ? r.etiqueta : r.top3[0]?.etiqueta)
+  if (dudosa) {
+    return (
+      <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }, brillo(C.oro)]}>
+        <Text style={[s.sobre, { color: C.oro }]}>NO CONCLUYENTE</Text>
+        <Text style={[s.nombre, { color: C.texto }]}>No estoy seguro</Text>
+        <Text style={[s.consejoTxt, { color: C.texto }]}>{r.motivo || 'No estoy seguro. Toma otra foto más cerca y con buena luz.'}</Text>
+        <Voz r={r} />
+        <ConsejosFoto />
+        <BotonOtra onPress={onOtra} />
+        <Plegable titulo="Cómo lo decidió la IA"><Pasos r={r} /></Plegable>
+      </View>
+    )
+  }
+
+  const sana = esSana(r.clase ?? ''), info = infoClase(r.clase ?? r.top3[0]?.clase ?? '', r.clase ? r.etiqueta : r.top3[0]?.etiqueta)
   const cultivo = CULTIVOS[r.cultivo ?? ''], urg = URGENCIA[info.urgencia]
-  const color = dudosa ? C.oro : sana ? C.sana : urg.color
+  const color = sana ? C.sana : urg.color
 
   return (
     <View style={[s.tarjeta, { backgroundColor: C.sup, borderColor: C.borde }, brillo(color)]}>
       <View style={s.fila}>
         {cultivo && <Text style={[s.etiqueta, { color: cultivo.color, borderColor: cultivo.color + '55' }]}>{cultivo.nombre}</Text>}
-        {!dudosa && <Text style={[s.etiqueta, { color, borderColor: color + '55' }]}>{urg.texto}</Text>}
+        <Text style={[s.etiqueta, { color, borderColor: color + '55' }]}>{urg.texto}</Text>
       </View>
-      {dudosa ? (
-        <>
-          <Text style={[s.sobre, { color: C.oro }]}>NO CONCLUYENTE</Text>
-          <Text style={[s.consejoTxt, { color: C.texto }]}>{r.motivo}</Text>
-          <ConsejosFoto />
-        </>
-      ) : (
-        <>
-          <View style={s.veredicto}>
-            <Text style={{ fontSize: 40 }}>{sana ? '✅' : '⚠️'}</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={[s.nombre, { color }]}>{info.nombre}</Text>
-              {!sana && info.agente !== '—' && <Text style={[s.cursiva, { color: C.tenue }]}>{info.agente}</Text>}
-            </View>
-            <View style={{ alignItems: 'center' }}>
-              <Text style={[s.pct, { color }]}>{Math.round((r.confianza ?? 0) * 100)}%</Text>
-              <Text style={[s.tenue, { color: C.tenue }]}>seguro</Text>
-            </View>
-          </View>
-          <Text style={[s.sobre, { color: C.acento, marginTop: 10 }]}>QUÉ HACER</Text>
-          <Text style={[s.consejoTxt, { color: C.texto }]}>{info.consejo}</Text>
-        </>
-      )}
-      <Voz r={r} info={dudosa ? undefined : info} sana={sana} />
+      <View style={s.veredicto}>
+        <Text style={{ fontSize: 40 }}>{sana ? '✅' : '⚠️'}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[s.nombre, { color }]}>{info.nombre}</Text>
+          {!sana && info.agente !== '—' && <Text style={[s.cursiva, { color: C.tenue }]}>{info.agente}</Text>}
+        </View>
+        <View style={{ alignItems: 'center' }}>
+          <Text style={[s.pct, { color }]}>{Math.round((r.confianza ?? 0) * 100)}%</Text>
+          <Text style={[s.tenue, { color: C.tenue }]}>seguro</Text>
+        </View>
+      </View>
+      <Text style={[s.sobre, { color: C.acento, marginTop: 10 }]}>QUÉ HACER</Text>
+      <Text style={[s.consejoTxt, { color: C.texto }]}>{info.consejo}</Text>
+      <Voz r={r} info={info} sana={sana} />
       <BotonOtra onPress={onOtra} />
       {r.estado === 'diagnostico' && <BotonReporte r={r} foto={foto} vision={vision} />}
-      <Text style={[s.tenue, { color: C.tenue, marginTop: 12 }]}>{dudosa ? `Más probable: ${info.nombre}` : 'Confianza calibrada'}</Text>
+      <Text style={[s.tenue, { color: C.tenue, marginTop: 12 }]}>Confianza calibrada</Text>
       <Barra valor={r.confianza ?? 0} color={color} />
       {r.top3.length > 1 && (
         <Plegable titulo="Otras posibilidades">
